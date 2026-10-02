@@ -24,6 +24,7 @@ export const NOTE_WINDOW_NON_DRAGGABLE_SELECTOR = [
  *   };
  *   moveWindow: (position: { x: number; y: number }) => Promise<void>;
  *   getWindowPosition?: () => Promise<{ x: number; y: number; surfaceRelativePointer?: boolean }>;
+ *   now?: () => number;
  *   getCanInteract: () => boolean;
  *   getIsEditing: () => boolean;
  *   getIsAlwaysOnTop?: () => boolean;
@@ -41,8 +42,17 @@ export function createNoteWindowDragController(input) {
   let dragging = false;
   // Wayland reports pointer "screen" coordinates relative to the window, which moves
   // under the pointer while dragging. The grab point then stays fixed and each event's
-  // offset from it is how far the window still has to move.
+  // offset from it is how far the window still has to move. An event is relative to
+  // wherever the compositor had the window when it sent it, and a move takes a frame or
+  // two to land, so events are dropped while a move is in flight or settling; otherwise
+  // the same motion would be counted twice and the window would overshoot the pointer.
   let surfaceRelativePointer = false;
+  let surfaceMoveInFlight = false;
+  let surfaceMoveSettledAt = 0;
+  let lastAppliedScreenX = NaN;
+  let lastAppliedScreenY = NaN;
+  const SURFACE_MOVE_SETTLE_MS = 32;
+  const now = input.now ?? (() => performance.now());
   let pendingPointerId = -1;
   let pendingStartScreenX = 0;
   let pendingStartScreenY = 0;
@@ -103,6 +113,10 @@ export function createNoteWindowDragController(input) {
     }
     lastDragScreenX = surfaceRelativePointer ? grabScreenX : event.screenX;
     lastDragScreenY = surfaceRelativePointer ? grabScreenY : event.screenY;
+    surfaceMoveInFlight = false;
+    surfaceMoveSettledAt = 0;
+    lastAppliedScreenX = NaN;
+    lastAppliedScreenY = NaN;
     dragPointerId = event.pointerId;
     setDragging(true);
     dragSurface.setPointerCapture(event.pointerId);
@@ -118,12 +132,14 @@ export function createNoteWindowDragController(input) {
       endManualWindowDrag();
       return;
     }
+    if (surfaceRelativePointer) {
+      moveSurfaceTowardPointer(event);
+      return;
+    }
     const deltaX = event.screenX - lastDragScreenX;
     const deltaY = event.screenY - lastDragScreenY;
-    if (!surfaceRelativePointer) {
-      lastDragScreenX = event.screenX;
-      lastDragScreenY = event.screenY;
-    }
+    lastDragScreenX = event.screenX;
+    lastDragScreenY = event.screenY;
     dragWindowX += deltaX;
     dragWindowY += deltaY;
     input
@@ -134,6 +150,41 @@ export function createNoteWindowDragController(input) {
       .catch((err) => {
         console.error("moveWindow failed", err);
         endManualWindowDrag();
+      });
+  }
+
+  /**
+   * @param {PointerEvent} event
+   * @param {{ ignoreSettle?: boolean }} [options]
+   */
+  function moveSurfaceTowardPointer(event, options = {}) {
+    if (surfaceMoveInFlight) return;
+    if (!options.ignoreSettle && now() < surfaceMoveSettledAt) return;
+    if (!Number.isFinite(event.screenX) || !Number.isFinite(event.screenY)) return;
+    // A release reports the last motion position, which may already have been applied.
+    if (event.screenX === lastAppliedScreenX && event.screenY === lastAppliedScreenY) return;
+    const deltaX = event.screenX - lastDragScreenX;
+    const deltaY = event.screenY - lastDragScreenY;
+    if (deltaX === 0 && deltaY === 0) return;
+    lastAppliedScreenX = event.screenX;
+    lastAppliedScreenY = event.screenY;
+    dragWindowX += deltaX;
+    dragWindowY += deltaY;
+    surfaceMoveInFlight = true;
+    input
+      .moveWindow({
+        x: dragWindowX,
+        y: dragWindowY,
+      })
+      .then(() => {
+        surfaceMoveSettledAt = now() + SURFACE_MOVE_SETTLE_MS;
+      })
+      .catch((err) => {
+        console.error("moveWindow failed", err);
+        endManualWindowDrag();
+      })
+      .finally(() => {
+        surfaceMoveInFlight = false;
       });
   }
 
@@ -171,6 +222,8 @@ export function createNoteWindowDragController(input) {
     if (surface?.hasPointerCapture(event.pointerId)) {
       surface.releasePointerCapture(event.pointerId);
     }
+    // Catch up with motion dropped while the last move settled.
+    if (surfaceRelativePointer) moveSurfaceTowardPointer(event, { ignoreSettle: true });
     persistCurrentPosition();
     endManualWindowDrag();
     clearPendingDragIntent();

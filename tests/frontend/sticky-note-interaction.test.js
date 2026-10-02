@@ -336,6 +336,9 @@ test("surface-relative pointer drag keeps the grab point under the pointer", asy
   // window, which moves under the pointer, so each event is an offset from the grab point.
   const moves = [];
   const persisted = [];
+  let clock = 0;
+  /** @type {(() => void) | null} */
+  let finishMove = null;
   const surface = {
     setPointerCapture() {},
     hasPointerCapture() {
@@ -348,9 +351,13 @@ test("surface-relative pointer drag keeps the grab point under the pointer", asy
       throw new Error("surface-relative drags read the position from getWindowPosition");
     },
     getWindowPosition: async () => ({ x: 100, y: 200, surfaceRelativePointer: true }),
-    moveWindow: async (position) => {
+    moveWindow: (position) => {
       moves.push(position);
+      return new Promise((resolve) => {
+        finishMove = () => resolve(undefined);
+      });
     },
+    now: () => clock,
     getCanInteract: () => true,
     getIsEditing: () => false,
     getIsAlwaysOnTop: () => true,
@@ -362,10 +369,11 @@ test("surface-relative pointer drag keeps the grab point under the pointer", asy
   const target = {
     closest: (selector) => (selector === ".note-shell" ? surface : null),
   };
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
   /** @param {number} screenX @param {number} screenY */
   const move = async (screenX, screenY) => {
     controller.onDragPointerMove({ pointerId: 3, buttons: 1, screenX, screenY, preventDefault() {} });
-    await new Promise((resolve) => setImmediate(resolve));
+    await flush();
   };
 
   controller.handleDragPointerDown({
@@ -379,14 +387,78 @@ test("surface-relative pointer drag keeps the grab point under the pointer", asy
   await move(16, 16);
   // The window has not moved yet: the pointer is 16, 21 away from the grab point.
   await move(26, 31);
-  // The window followed, so the pointer is back near the grab point, 3, 2 further on.
+  // Sent before the compositor applied that move, so relative to the old position.
+  await move(30, 35);
+  finishMove?.();
+  await flush();
+  clock += 10;
+  await move(31, 36);
+  // Settled: the window followed, and the pointer is 3, 2 past the grab point.
+  clock += 40;
   await move(13, 12);
-  controller.onDragPointerUp({ pointerId: 3, currentTarget: surface });
-  await new Promise((resolve) => setImmediate(resolve));
+  finishMove?.();
+  await flush();
+  // Dropped while that move settles; the release catches up with it.
+  await move(15, 13);
+  controller.onDragPointerUp({ pointerId: 3, screenX: 15, screenY: 13, currentTarget: surface });
+  await flush();
 
   assert.deepEqual(moves, [
     { x: 116, y: 221 },
     { x: 119, y: 223 },
+    { x: 124, y: 226 },
   ]);
-  assert.deepEqual(persisted, [{ x: 119, y: 223 }]);
+  assert.deepEqual(persisted, [{ x: 124, y: 226 }]);
+});
+
+test("a surface-relative release does not reapply the last applied pointer position", async () => {
+  const moves = [];
+  const persisted = [];
+  const surface = {
+    setPointerCapture() {},
+    hasPointerCapture() {
+      return true;
+    },
+    releasePointerCapture() {},
+  };
+  const controller = createNoteWindowDragController({
+    getCurrentWindow: () => {
+      throw new Error("unused");
+    },
+    getWindowPosition: async () => ({ x: 100, y: 200, surfaceRelativePointer: true }),
+    moveWindow: async (position) => {
+      moves.push(position);
+    },
+    now: () => 0,
+    getCanInteract: () => true,
+    getIsEditing: () => false,
+    getIsAlwaysOnTop: () => true,
+    dismissFloatingPanels() {},
+    onPositionPersist: (position) => {
+      persisted.push(position);
+    },
+  });
+  const target = {
+    closest: (selector) => (selector === ".note-shell" ? surface : null),
+  };
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  controller.handleDragPointerDown({
+    button: 0,
+    pointerId: 4,
+    screenX: 10,
+    screenY: 10,
+    target,
+    currentTarget: surface,
+  });
+  controller.onDragPointerMove({ pointerId: 4, buttons: 1, screenX: 16, screenY: 16, preventDefault() {} });
+  await flush();
+  controller.onDragPointerMove({ pointerId: 4, buttons: 1, screenX: 46, screenY: 10, preventDefault() {} });
+  await flush();
+  // Wayland button events carry no position: the release repeats the applied one.
+  controller.onDragPointerUp({ pointerId: 4, screenX: 46, screenY: 10, currentTarget: surface });
+  await flush();
+
+  assert.deepEqual(moves, [{ x: 136, y: 200 }]);
+  assert.deepEqual(persisted, [{ x: 136, y: 200 }]);
 });
