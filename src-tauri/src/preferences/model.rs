@@ -23,7 +23,9 @@ pub struct PanelPreferences {
     pub sort_mode: String,
     #[serde(default = "default_glass")]
     pub glass_opacity: f64,
-    #[serde(default)]
+    // Desktop stickies are on by default, matching the panels' `overlayEnabled ?? true`.
+    // With a plain `default` a first run reads `false`, and pinned notes never open a window.
+    #[serde(default = "default_true")]
     pub overlay_enabled: bool,
     #[serde(default)]
     pub show_panel_on_startup: bool,

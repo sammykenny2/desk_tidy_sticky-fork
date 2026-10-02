@@ -78,6 +78,7 @@ mod tests {
     fn missing_file_uses_schema_defaults() {
         let path = location(); let prefs = read(&path).unwrap();
         assert_eq!(prefs.focus_tasks_json, "[]"); assert_eq!(prefs.workspace_zoom, 1.0);
+        assert!(prefs.overlay_enabled, "desktop stickies must be visible on a first run");
         fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
 }
