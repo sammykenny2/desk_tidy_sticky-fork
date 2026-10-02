@@ -23,6 +23,7 @@ export const NOTE_WINDOW_NON_DRAGGABLE_SELECTOR = [
  *     scaleFactor: () => Promise<number>;
  *   };
  *   moveWindow: (position: { x: number; y: number }) => Promise<void>;
+ *   getWindowPosition?: () => Promise<{ x: number; y: number; surfaceRelativePointer?: boolean }>;
  *   getCanInteract: () => boolean;
  *   getIsEditing: () => boolean;
  *   getIsAlwaysOnTop?: () => boolean;
@@ -38,6 +39,10 @@ export function createNoteWindowDragController(input) {
   let lastDragScreenY = 0;
   let dragPointerId = -1;
   let dragging = false;
+  // Wayland reports pointer "screen" coordinates relative to the window, which moves
+  // under the pointer while dragging. The grab point then stays fixed and each event's
+  // offset from it is how far the window still has to move.
+  let surfaceRelativePointer = false;
   let pendingPointerId = -1;
   let pendingStartScreenX = 0;
   let pendingStartScreenY = 0;
@@ -82,12 +87,22 @@ export function createNoteWindowDragController(input) {
    * @param {HTMLDivElement} dragSurface
    */
   async function startManualWindowDrag(event, dragSurface) {
-    const win = input.getCurrentWindow();
-    const [position, scaleFactor] = await Promise.all([win.outerPosition(), win.scaleFactor()]);
-    dragWindowX = position.x / scaleFactor;
-    dragWindowY = position.y / scaleFactor;
-    lastDragScreenX = event.screenX;
-    lastDragScreenY = event.screenY;
+    const grabScreenX = pendingStartScreenX;
+    const grabScreenY = pendingStartScreenY;
+    if (input.getWindowPosition) {
+      const position = await input.getWindowPosition();
+      dragWindowX = position.x;
+      dragWindowY = position.y;
+      surfaceRelativePointer = !!position.surfaceRelativePointer;
+    } else {
+      const win = input.getCurrentWindow();
+      const [position, scaleFactor] = await Promise.all([win.outerPosition(), win.scaleFactor()]);
+      dragWindowX = position.x / scaleFactor;
+      dragWindowY = position.y / scaleFactor;
+      surfaceRelativePointer = false;
+    }
+    lastDragScreenX = surfaceRelativePointer ? grabScreenX : event.screenX;
+    lastDragScreenY = surfaceRelativePointer ? grabScreenY : event.screenY;
     dragPointerId = event.pointerId;
     setDragging(true);
     dragSurface.setPointerCapture(event.pointerId);
@@ -105,8 +120,10 @@ export function createNoteWindowDragController(input) {
     }
     const deltaX = event.screenX - lastDragScreenX;
     const deltaY = event.screenY - lastDragScreenY;
-    lastDragScreenX = event.screenX;
-    lastDragScreenY = event.screenY;
+    if (!surfaceRelativePointer) {
+      lastDragScreenX = event.screenX;
+      lastDragScreenY = event.screenY;
+    }
     dragWindowX += deltaX;
     dragWindowY += deltaY;
     input

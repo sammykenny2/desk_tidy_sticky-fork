@@ -6,15 +6,17 @@ pub(crate) use panel::{
     show_preferred_panel_window, sync_panel_window_shell_state,
 };
 pub(crate) use shortcuts::{
-    get_shortcut_settings, initialize_shortcut_settings, update_shortcut_settings,
+    get_shortcut_settings, initialize_shortcut_settings, run_command_line_action,
+    update_shortcut_settings,
 };
 pub(crate) use sticky::{
     apply_note_window_frost, apply_note_window_layer, apply_overlay_input_state,
     apply_window_no_snap_by_label, clear_active_topmost_editing_sticky,
-    configure_note_panel_window, dismiss_note_window_by_label, get_overlay_interaction,
-    hide_active_topmost_editing_sticky, hide_note_to_edge, mark_active_topmost_editing_sticky,
-    move_note_window_without_activation, normalize_note_window_position, pin_window_to_desktop,
-    reveal_note_from_edge, set_note_auto_hide_enabled, set_note_window_reserve,
+    configure_note_panel_window, dismiss_note_window_by_label, get_note_window_position,
+    get_overlay_interaction, hide_active_topmost_editing_sticky, hide_note_to_edge, layer_debug,
+    mark_active_topmost_editing_sticky, move_note_window_without_activation,
+    normalize_note_window_position, pin_window_to_desktop, reveal_note_from_edge,
+    set_note_auto_hide_enabled, set_note_window_reserve, set_note_window_size,
     shortcut_hide_or_reveal, sync_all_note_window_layers, sync_note_window_layer,
     toggle_hidden_stickies, toggle_overlay_interaction, toggle_wallpaper_layer_and_apply,
     toggle_z_order_and_apply, unpin_window_from_desktop,

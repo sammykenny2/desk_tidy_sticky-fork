@@ -1,4 +1,6 @@
 use crate::notes::{service as notes_service, store as notes_store, NoteSortMode};
+#[cfg(target_os = "linux")]
+use crate::platform::linux;
 #[cfg(target_os = "macos")]
 use crate::platform::{macos, run_macos_window_op};
 #[cfg(target_os = "windows")]
@@ -11,7 +13,7 @@ use super::effects::apply_note_window_frost_by_label;
 /// `DESK_TIDY_LAYER_DEBUG=1` prints every note-window layer and input-state transition to
 /// stderr. Layer bugs are invisible otherwise: the Win32 calls report success while the
 /// window ends up somewhere else, so the actual parent and styles are what get logged.
-pub(super) fn layer_debug(message: impl FnOnce() -> String) {
+pub(crate) fn layer_debug(message: impl FnOnce() -> String) {
     static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     let enabled = *ENABLED
         .get_or_init(|| std::env::var_os("DESK_TIDY_LAYER_DEBUG").is_some_and(|v| v == "1"));
@@ -153,6 +155,19 @@ pub(super) fn apply_note_window_layer_with_interaction_by_label(
             }
         }
         return Ok(());
+    }
+
+    #[cfg(target_os = "linux")]
+    if linux::is_note_surface(&w) {
+        let layer = if force_global_top || is_always_on_top {
+            linux::NoteLayer::Topmost
+        } else if is_wallpaper {
+            linux::NoteLayer::Wallpaper
+        } else {
+            linux::NoteLayer::Desktop
+        };
+        layer_debug(|| format!("apply layer {label}: layer-shell {layer:?}"));
+        return linux::set_note_surface_layer(&w, layer);
     }
 
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]

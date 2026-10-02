@@ -13,11 +13,13 @@ use desktop::{apply_macos_runtime_dock_icon, ensure_hidden_workspace_runtime_win
 use desktop::{
     apply_note_window_frost, apply_note_window_layer, apply_window_no_snap_by_label,
     clear_active_topmost_editing_sticky, configure_note_panel_window, dismiss_note_window_by_label,
-    get_overlay_interaction, get_shortcut_settings, hide_active_topmost_editing_sticky,
+    get_note_window_position, get_overlay_interaction, get_shortcut_settings,
+    hide_active_topmost_editing_sticky,
     hide_note_to_edge, hide_panel_window, initialize_shortcut_settings,
     mark_active_topmost_editing_sticky, minimize_panel_window, move_note_window_without_activation,
     normalize_note_window_position, pin_window_to_desktop, reveal_note_from_edge,
-    set_note_auto_hide_enabled, set_note_window_reserve, show_preferred_panel_window,
+    set_note_auto_hide_enabled, set_note_window_reserve, set_note_window_size,
+    show_preferred_panel_window,
     sync_all_note_window_layers, sync_note_window_layer, sync_panel_window_shell_state,
     toggle_hidden_stickies, toggle_overlay_interaction, toggle_wallpaper_layer_and_apply,
     toggle_z_order_and_apply, unpin_window_from_desktop, update_shortcut_settings,
@@ -54,8 +56,10 @@ pub fn run() {
         .manage(ActiveTopmostStickyState::default())
         .manage(StickyWindowReserveState::default())
         .manage(notes::store::NotesStore::default())
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            show_preferred_panel_window(app);
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if !desktop::run_command_line_action(app, &argv) {
+                show_preferred_panel_window(app);
+            }
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init());
@@ -66,11 +70,19 @@ pub fn run() {
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
 
+    #[cfg(target_os = "linux")]
+    let builder = builder.manage(platform::linux::LinuxNoteSurfaceState::default());
+
     #[cfg(not(target_os = "macos"))]
     let builder = builder;
 
     let app = builder
         .setup(|app| {
+            // The single-instance plugin hands actions to a running instance; with none
+            // running, `--quit` has nothing to stop.
+            if std::env::args().skip(1).any(|arg| arg == "--quit") {
+                std::process::exit(0);
+            }
             #[cfg(desktop)]
             {
                 #[cfg(target_os = "windows")]
@@ -180,6 +192,8 @@ pub fn run() {
             sync_note_window_layer,
             sync_all_note_window_layers,
             move_note_window_without_activation,
+            get_note_window_position,
+            set_note_window_size,
             set_note_window_reserve,
             apply_window_no_snap_by_label,
             update_tray_texts,

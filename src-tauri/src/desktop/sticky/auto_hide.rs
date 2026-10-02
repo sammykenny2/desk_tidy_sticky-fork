@@ -72,14 +72,20 @@ fn position_matches(position: Option<f64>, expected: f64) -> bool {
 }
 
 fn window_rect(window: &tauri::WebviewWindow) -> Result<(Rect, f64), String> {
-    let position = window.outer_position().map_err(|e| e.to_string())?;
-    let size = window.outer_size().map_err(|e| e.to_string())?;
     let raw_scale = window.scale_factor().map_err(|e| e.to_string())?;
     let scale = if raw_scale.is_finite() && raw_scale > 0.0 {
         raw_scale
     } else {
         1.0
     };
+    // A layer-shell note reports no position or frame; the platform layer tracks both.
+    #[cfg(target_os = "linux")]
+    if let Some(g) = crate::platform::linux::note_surface_geometry(window) {
+        let rect = Rect { x: g.x, y: g.y, width: g.width, height: g.height };
+        return Ok((rect, scale));
+    }
+    let position = window.outer_position().map_err(|e| e.to_string())?;
+    let size = window.outer_size().map_err(|e| e.to_string())?;
     Ok((from_physical(Rect {
         x: position.x as f64,
         y: position.y as f64,
@@ -89,8 +95,10 @@ fn window_rect(window: &tauri::WebviewWindow) -> Result<(Rect, f64), String> {
 }
 
 fn note_window_geometry(note: &notes::Note, outer: Rect) -> WindowGeometry {
-    let body_width = note.width.unwrap_or(outer.width).clamp(1.0, outer.width);
-    let body_height = note.height.unwrap_or(outer.height).clamp(1.0, outer.height);
+    // `max(1.0)`: an unmapped window can report a zero size, and `clamp` panics when
+    // its bounds are inverted.
+    let body_width = note.width.unwrap_or(outer.width).clamp(1.0, outer.width.max(1.0));
+    let body_height = note.height.unwrap_or(outer.height).clamp(1.0, outer.height.max(1.0));
     let max_offset_x = (outer.width - body_width).max(0.0);
     let max_offset_y = (outer.height - body_height).max(0.0);
     let body_offset_x = clamp(note.x.unwrap_or(outer.x) - outer.x, 0.0, max_offset_x);

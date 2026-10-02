@@ -25,9 +25,9 @@ pub use display_recovery::{schedule_hidden_note_recovery, StickyDisplayRecoveryS
 pub use effects::apply_note_window_frost;
 use effects::{apply_note_window_frost_by_label, sync_note_window_frost_by_id};
 pub use layer::apply_overlay_input_state;
+pub(crate) use layer::layer_debug;
 use layer::{
     apply_note_window_layer_with_interaction_by_label, get_overlay_interaction_disabled,
-    layer_debug,
 };
 pub use panel_window::{configure_note_panel_window, dismiss_note_window_by_label};
 
@@ -349,10 +349,64 @@ pub fn move_note_window_without_activation(
         return windows::move_window_no_activate(hwnd_isize, physical_x, physical_y);
     }
 
+    #[cfg(target_os = "linux")]
+    if crate::platform::linux::is_note_surface(&window) {
+        return crate::platform::linux::move_note_surface(&window, x, y);
+    }
+
     #[cfg(not(target_os = "windows"))]
     {
         window
             .set_position(tauri::Position::Logical(tauri::LogicalPosition::new(x, y)))
             .map_err(|e| e.to_string())
     }
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteWindowPosition {
+    x: f64,
+    y: f64,
+    /// Pointer events in this window report "screen" coordinates relative to the window.
+    surface_relative_pointer: bool,
+}
+
+/// The note window's logical outer position. Layer-shell notes on Linux have no position
+/// the window API can report (it returns 0, 0), so the frontend reads it here.
+#[tauri::command]
+pub fn get_note_window_position(
+    window: tauri::WebviewWindow,
+) -> Result<NoteWindowPosition, String> {
+    #[cfg(target_os = "linux")]
+    if let Some(g) = crate::platform::linux::note_surface_geometry(&window) {
+        return Ok(NoteWindowPosition {
+            x: g.x,
+            y: g.y,
+            surface_relative_pointer: true,
+        });
+    }
+    let position = window.outer_position().map_err(|e| e.to_string())?;
+    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    Ok(NoteWindowPosition {
+        x: f64::from(position.x) / scale,
+        y: f64::from(position.y) / scale,
+        surface_relative_pointer: false,
+    })
+}
+
+/// Resizes a note window to a logical size. A layer-shell note on Linux ignores the
+/// regular window resize, so the frontend resizes notes through this command there.
+#[tauri::command]
+pub fn set_note_window_size(
+    window: tauri::WebviewWindow,
+    width: f64,
+    height: f64,
+) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    if crate::platform::linux::is_note_surface(&window) {
+        return crate::platform::linux::resize_note_surface(&window, width, height);
+    }
+    window
+        .set_size(tauri::Size::Logical(tauri::LogicalSize::new(width, height)))
+        .map_err(|e| e.to_string())
 }

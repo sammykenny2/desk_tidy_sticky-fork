@@ -22,6 +22,7 @@
     resolveNoteId,
   } from "$lib/note/note-window-actions.js";
   import { createNoteWindowDragController } from "$lib/note/note-window-drag.js";
+  import { isLinuxDesktop } from "$lib/runtime/platform.js";
   import { createStickyEdgeRevealController } from "$lib/note/sticky-edge-reveal.js";
   import {
     getCollapsedNoteWindowFrame,
@@ -106,6 +107,7 @@
   const isWindows =
     typeof navigator !== "undefined" &&
     /win/i.test(String(navigator.userAgent || navigator.platform || ""));
+  const linuxDesktop = isLinuxDesktop();
   const noteSurfaceAlpha = $derived(resolveNoteSurfaceAlpha(noteOpacity, noteFrost));
   const noteBackground = $derived(hexToRgba(noteBgColor, noteSurfaceAlpha));
   const noteWindowRadius = $derived(isWindows ? "0px" : "12px");
@@ -244,7 +246,14 @@
     return true;
   }
 
+  /** @returns {Promise<{ x: number; y: number; surfaceRelativePointer?: boolean }>} */
+  function getNoteWindowPosition() {
+    return invoke("get_note_window_position");
+  }
+
   async function getLogicalOuterPosition() {
+    // A layer-shell note on Linux has no position the window API can report.
+    if (linuxDesktop) return getNoteWindowPosition();
     const currentWindow = getCurrentWindow();
     const [position, scaleFactor] = await Promise.all([
       currentWindow.outerPosition(),
@@ -266,7 +275,9 @@
     const logicalHeight = Math.max(NOTE_MIN_SIZE_PX, Math.round(nextHeight));
     try {
       const operations = [
-        getCurrentWindow().setSize(new LogicalSize(logicalWidth, logicalHeight)),
+        linuxDesktop
+          ? invoke("set_note_window_size", { width: logicalWidth, height: logicalHeight })
+          : getCurrentWindow().setSize(new LogicalSize(logicalWidth, logicalHeight)),
       ];
       if (nextOuterPosition) {
         operations.push(
@@ -432,17 +443,20 @@
   async function getPersistableWindowSize() {
     let rawWidth = Math.max(NOTE_MIN_SIZE_PX, Math.round(window.innerWidth || NOTE_MIN_SIZE_PX));
     let rawHeight = Math.max(NOTE_MIN_SIZE_PX, Math.round(window.innerHeight || NOTE_MIN_SIZE_PX));
-    try {
-      const currentWindow = getCurrentWindow();
-      const [physicalSize, scaleFactor] = await Promise.all([
-        currentWindow.innerSize(),
-        currentWindow.scaleFactor(),
-      ]);
-      const logicalSize = physicalSize.toLogical(scaleFactor);
-      rawWidth = Math.max(NOTE_MIN_SIZE_PX, Math.round(logicalSize.width || rawWidth));
-      rawHeight = Math.max(NOTE_MIN_SIZE_PX, Math.round(logicalSize.height || rawHeight));
-    } catch (e) {
-      console.error("getPersistableWindowSize", e);
+    // On Linux the viewport is the measurement: a layer-shell note's native size is stale.
+    if (!linuxDesktop) {
+      try {
+        const currentWindow = getCurrentWindow();
+        const [physicalSize, scaleFactor] = await Promise.all([
+          currentWindow.innerSize(),
+          currentWindow.scaleFactor(),
+        ]);
+        const logicalSize = physicalSize.toLogical(scaleFactor);
+        rawWidth = Math.max(NOTE_MIN_SIZE_PX, Math.round(logicalSize.width || rawWidth));
+        rawHeight = Math.max(NOTE_MIN_SIZE_PX, Math.round(logicalSize.height || rawHeight));
+      } catch (e) {
+        console.error("getPersistableWindowSize", e);
+      }
     }
     const reserve = getAppliedControlsReserve();
     const width = Math.max(NOTE_MIN_SIZE_PX, rawWidth - reserve.horizontal);
@@ -1035,6 +1049,7 @@
 
   const noteWindowDrag = createNoteWindowDragController({
     getCurrentWindow,
+    getWindowPosition: linuxDesktop ? getNoteWindowPosition : undefined,
     moveWindow: (position) =>
       invoke("move_note_window_without_activation", {
         x: position.x,

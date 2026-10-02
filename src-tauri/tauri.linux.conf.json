@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "title": "Desk Tidy Sticky",
+        "label": "main",
+        "width": 360,
+        "height": 500,
+        "center": true,
+        "transparent": false,
+        "decorations": false,
+        "skipTaskbar": false,
+        "resizable": true,
+        "devtools": true
+      }
+    ]
+  }
+}

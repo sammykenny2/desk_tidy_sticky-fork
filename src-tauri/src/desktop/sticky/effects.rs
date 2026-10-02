@@ -1,18 +1,19 @@
 use crate::notes::{service as notes_service, store as notes_store, NoteSortMode};
 #[cfg(not(target_os = "macos"))]
-use tauri::{
-    utils::config::WindowEffectsConfig,
-    window::{Effect, EffectsBuilder},
-};
+use tauri::utils::config::WindowEffectsConfig;
+#[cfg(target_os = "windows")]
+use tauri::window::{Effect, EffectsBuilder};
 use tauri::{window::Color, Manager};
 #[cfg(target_os = "macos")]
 use window_vibrancy::{
     apply_vibrancy, clear_vibrancy, NSVisualEffectMaterial, NSVisualEffectState,
 };
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 const NATIVE_FROST_THRESHOLD: f64 = 0.02;
 const TRANSPARENT: Color = Color(0, 0, 0, 0);
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 fn clamp_frost(frost: f64) -> f64 {
     frost.clamp(0.0, 1.0)
 }

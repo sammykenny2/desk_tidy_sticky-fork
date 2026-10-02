@@ -330,3 +330,63 @@ test("note surface drag moves the native window and persists its final position"
   assert.deepEqual(moves, [{ x: 110, y: 215 }]);
   assert.deepEqual(persisted, [{ x: 110, y: 215 }]);
 });
+
+test("surface-relative pointer drag keeps the grab point under the pointer", async () => {
+  // Wayland layer-shell notes report pointer "screen" coordinates relative to the
+  // window, which moves under the pointer, so each event is an offset from the grab point.
+  const moves = [];
+  const persisted = [];
+  const surface = {
+    setPointerCapture() {},
+    hasPointerCapture() {
+      return true;
+    },
+    releasePointerCapture() {},
+  };
+  const controller = createNoteWindowDragController({
+    getCurrentWindow: () => {
+      throw new Error("surface-relative drags read the position from getWindowPosition");
+    },
+    getWindowPosition: async () => ({ x: 100, y: 200, surfaceRelativePointer: true }),
+    moveWindow: async (position) => {
+      moves.push(position);
+    },
+    getCanInteract: () => true,
+    getIsEditing: () => false,
+    getIsAlwaysOnTop: () => true,
+    dismissFloatingPanels() {},
+    onPositionPersist: (position) => {
+      persisted.push(position);
+    },
+  });
+  const target = {
+    closest: (selector) => (selector === ".note-shell" ? surface : null),
+  };
+  /** @param {number} screenX @param {number} screenY */
+  const move = async (screenX, screenY) => {
+    controller.onDragPointerMove({ pointerId: 3, buttons: 1, screenX, screenY, preventDefault() {} });
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+
+  controller.handleDragPointerDown({
+    button: 0,
+    pointerId: 3,
+    screenX: 10,
+    screenY: 10,
+    target,
+    currentTarget: surface,
+  });
+  await move(16, 16);
+  // The window has not moved yet: the pointer is 16, 21 away from the grab point.
+  await move(26, 31);
+  // The window followed, so the pointer is back near the grab point, 3, 2 further on.
+  await move(13, 12);
+  controller.onDragPointerUp({ pointerId: 3, currentTarget: surface });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(moves, [
+    { x: 116, y: 221 },
+    { x: 119, y: 223 },
+  ]);
+  assert.deepEqual(persisted, [{ x: 119, y: 223 }]);
+});
