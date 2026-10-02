@@ -26,6 +26,8 @@
 
 贴纸控制模式展开后，主体以外的区域依旧能透出桌面，这个外观与 Windows 一致。
 
+即使按上面创建窗口，layer surface 被移动、改尺寸或换层之后，WebKit 仍只重绘它认为受损的区域（文字块）：release 版拖拽并切换层级后，贴纸上部文字块与下部之间出现一条笔直的色差分界；重新创建窗口后消失，证明是残留旧画面而非样式。处理：`note_surface.rs` 在每次 reconfigure 后 120ms（拖拽时只在最后一次之后）执行一段脚本，把根元素 `opacity` 设为 `0.999` 再于两帧后还原，使整页受损、下一帧完整重绘。
+
 ### 1.3 Wayland 下贴纸无法定位，也无法分层
 
 - 原生 Wayland 的 xdg_toplevel 不能自行设定位置：tao 的 `set_position` 无效，`outer_position` 恒为 `(0, 0)`，贴纸的 `x/y` 无法还原。
@@ -51,6 +53,8 @@ gtk-layer-shell 用 GTK 窗口的 size request 作为 surface 尺寸，`gtk_wind
 
 - `outer_position` 对 layer surface 返回 `(0, 0)`，`outer_size` 是旧值。Rust 侧在 `LinuxNoteSurfaceState` 中记录每张贴纸的逻辑坐标与尺寸，`auto_hide` 的窗口矩形、`persist_note_window_size` 和新命令 `get_note_window_position` 都从这里读取。
 - WebKitGTK 在 Wayland 下给出的 `screenX/screenY` 是相对 surface 的坐标（日志中 `screenX == clientX`）。原拖拽算法按相邻事件的 `screenX` 差值移动窗口，窗口跟着指针移动后差值归零，拖不动。`get_note_window_position` 返回 `surfaceRelativePointer: true` 时，`note-window-drag.js` 改为以按下点为固定参照，每个事件相对按下点的偏移即窗口还需移动的距离。Windows/macOS 不变。
+- 每个指针事件相对的是合成器发出它时窗口所在的位置；`WAYLAND_DEBUG` 显示 `set_margin` 之后约 2–7ms 才收到 `configure`，期间的 motion 仍相对旧位置，照算会把同一段移动计两次而越拖越超前。因此移动请求未完成或完成后 32ms 内的事件一律丢弃，只用之后的事件。Wayland 的按键事件不带坐标，WebKit 在松开时沿用最后一次 motion 的坐标：若该坐标已应用过则不再应用（否则松手时会再超前一段），否则用它补上 settle 期间丢弃的移动。
+- 实测时注意：用 uinput 相对移动模拟指针会经过 libinput 加速，指针实际位移大于发送的数值；应以“按下点始终在指针下”为准，或用 `wlrctl pointer move`（virtual-pointer，无加速）产生移动。
 
 ### 1.6 tao 在未 realize 的窗口上 unwrap
 
@@ -73,8 +77,8 @@ tao 处理 `set_ignore_cursor_events(true)` 时对 `window.window()` 直接 `unw
 ## 3. 实机验证结果
 
 - 面板显示/隐藏多次后内容完整；工作台首次显示完整。
-- 贴纸：启动时按保存坐标出现在桌面层；置顶后位于终端窗口之上；拖拽后坐标写回 `notes.json`；在桌面层、置顶、壁纸层之间切换后内容完整；桌面层点击穿透到 pcmanfm；置顶贴纸点编辑按钮后可用键盘输入并保存；控制模式展开/收起时窗口扩张、移动并恢复原尺寸。
-- `make check`、`make test`（前端 47、Rust 60）通过。
+- 贴纸：启动时按保存坐标出现在桌面层；置顶后位于终端窗口之上；拖拽后坐标写回 `notes.json`，release 版用 virtual-pointer 做快/慢共 4 次拖拽，窗口位移与指针位移完全一致；在桌面层、置顶、壁纸层之间切换后内容完整；桌面层点击穿透到 pcmanfm；置顶贴纸点编辑按钮后可用键盘输入并保存；控制模式展开/收起时窗口扩张、移动并恢复原尺寸。
+- `make check`、`make test`（前端 48、Rust 60）通过。
 
 ## 4. 调试入口
 
