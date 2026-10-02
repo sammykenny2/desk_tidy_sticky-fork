@@ -271,6 +271,28 @@ fn schedule_repaint(window: &tauri::WebviewWindow) {
     });
 }
 
+/// Makes a note window let the cursor through to what is below it, or take it again.
+///
+/// tao sets the input region on the GdkWindow directly. On Wayland tao gives every window
+/// a header bar, which makes GTK treat it as client-side decorated, and GTK then rebuilds
+/// the GdkWindow input region from the widget's own input shape on every size allocation,
+/// which moving a layer surface or changing its layer triggers. The note would start
+/// catching the cursor again; an input shape set on the widget survives the rebuild.
+/// GDK only sends a new input region with the window's next frame, so queue one.
+pub(crate) fn set_note_ignore_cursor(
+    window: &tauri::WebviewWindow,
+    ignore: bool,
+) -> Result<(), String> {
+    with_gtk_window(window, "set_note_ignore_cursor", move |gtk_window| {
+        if ignore {
+            gtk_window.input_shape_combine_region(Some(&gtk::cairo::Region::create()));
+        } else {
+            gtk_window.input_shape_combine_region(None);
+        }
+        gtk_window.queue_draw();
+    })
+}
+
 pub(crate) fn set_note_surface_layer(
     window: &tauri::WebviewWindow,
     layer: NoteLayer,

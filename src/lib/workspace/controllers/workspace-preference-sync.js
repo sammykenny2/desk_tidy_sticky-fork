@@ -2,6 +2,7 @@
  * @param {{
  *   listenPreferencesChanged: typeof import("$lib/preferences/preferences-sync.js").listenPreferencesChanged;
  *   setShowPanelOnStartup: (next: boolean) => void;
+ *   setDesktopStickiesSelectable?: (next: boolean) => void;
  *   setAutostartEnabled: (next: boolean) => void;
  *   setStickiesVisible: (next: boolean) => void;
  *   syncWindows: () => Promise<void>;
@@ -18,6 +19,9 @@ export function createWorkspacePreferenceSync(deps) {
     return deps.listenPreferencesChanged(async (updates) => {
       if (typeof updates.showPanelOnStartup === "boolean") {
         deps.setShowPanelOnStartup(updates.showPanelOnStartup);
+      }
+      if (typeof updates.desktopStickiesSelectable === "boolean") {
+        deps.setDesktopStickiesSelectable?.(updates.desktopStickiesSelectable);
       }
       if (typeof updates.autostartEnabled === "boolean") {
         deps.setAutostartEnabled(updates.autostartEnabled);

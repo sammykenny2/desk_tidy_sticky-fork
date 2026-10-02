@@ -146,6 +146,7 @@
   let isAutostartEnabled = $state(false);
   let autostartAvailable = $state(false);
   let showPanelOnStartup = $state(false);
+  let desktopStickiesSelectable = $state(false);
   let markdownStorageMode = $state("app_default");
   let markdownStorageRoot = $state("");
   let markdownStorageSnapshot = $state(null);
@@ -407,6 +408,9 @@
     if ("mainTab" in patch && patch.mainTab !== mainTab) void setMainTab(patch.mainTab);
     if ("stickiesVisible" in patch) stickiesVisible = patch.stickiesVisible;
     if ("showPanelOnStartup" in patch) showPanelOnStartup = patch.showPanelOnStartup;
+    if ("desktopStickiesSelectable" in patch) {
+      desktopStickiesSelectable = patch.desktopStickiesSelectable;
+    }
     if ("workspaceTheme" in patch) workspaceTheme = patch.workspaceTheme;
     if ("workspaceCustomCss" in patch) workspaceCustomCss = patch.workspaceCustomCss;
     if ("workspaceZoom" in patch) workspaceZoom = patch.workspaceZoom;
@@ -764,6 +768,9 @@
     setShowPanelOnStartup: (next) => {
       showPanelOnStartup = next;
     },
+    setDesktopStickiesSelectable: (next) => {
+      desktopStickiesSelectable = next;
+    },
     setAutostartEnabled: (next) => {
       isAutostartEnabled = next;
     },
@@ -1061,6 +1068,7 @@
   {isAutostartEnabled}
   {autostartAvailable}
   bind:showPanelOnStartup
+  {desktopStickiesSelectable}
   storageMode={markdownStorageMode}
   storageRoot={markdownStorageRoot}
   storageSnapshot={markdownStorageSnapshot}

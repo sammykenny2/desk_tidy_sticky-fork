@@ -48,6 +48,7 @@ pub fn apply_overlay_input_state(app: &tauri::AppHandle, interaction_disabled: b
             notes.len()
         )
     });
+    let desktop_selectable = crate::preferences::read_desktop_stickies_selectable();
     for (label, w) in app.webview_windows() {
         if label.starts_with("note-") {
             let note_id = label.trim_start_matches("note-");
@@ -56,6 +57,7 @@ pub fn apply_overlay_input_state(app: &tauri::AppHandle, interaction_disabled: b
                     n.is_always_on_top,
                     n.is_wallpaper,
                     interaction_disabled,
+                    desktop_selectable,
                 );
                 layer_debug(|| {
                     format!(
@@ -63,7 +65,7 @@ pub fn apply_overlay_input_state(app: &tauri::AppHandle, interaction_disabled: b
                         n.is_always_on_top, n.is_wallpaper
                     )
                 });
-                if let Err(error) = w.set_ignore_cursor_events(ignore_cursor) {
+                if let Err(error) = set_note_ignore_cursor(&w, ignore_cursor) {
                     eprintln!("[layer] {label}: set_ignore_cursor_events failed: {error}");
                 }
                 if let Err(error) = apply_note_window_layer_with_interaction_by_label(
@@ -78,12 +80,23 @@ pub fn apply_overlay_input_state(app: &tauri::AppHandle, interaction_disabled: b
                 let _ = apply_note_window_frost_by_label(app, &label, n.frost.unwrap_or_default());
             } else {
                 layer_debug(|| format!("  {label}: no matching note"));
-                if let Err(error) = w.set_ignore_cursor_events(interaction_disabled) {
+                if let Err(error) = set_note_ignore_cursor(&w, interaction_disabled) {
                     eprintln!("[layer] {label}: set_ignore_cursor_events failed: {error}");
                 }
             }
         }
     }
+}
+
+/// Makes a note window ignore the cursor or take it again. Linux sets the input shape on
+/// the GTK widget, because GTK rebuilds the one tao sets (see `linux::set_note_ignore_cursor`).
+pub(super) fn set_note_ignore_cursor(w: &tauri::WebviewWindow, ignore: bool) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    return linux::set_note_ignore_cursor(w, ignore);
+
+    #[cfg(not(target_os = "linux"))]
+    w.set_ignore_cursor_events(ignore)
+        .map_err(|e| e.to_string())
 }
 
 pub(super) fn apply_note_window_layer_with_interaction_by_label(
@@ -148,6 +161,7 @@ pub(super) fn apply_note_window_layer_with_interaction_by_label(
                     is_always_on_top,
                     is_wallpaper,
                     interaction_disabled,
+                    crate::preferences::read_desktop_stickies_selectable(),
                 );
                 run_macos_window_op(&w, "macos_attach_to_desktop_layer", move |ptr| {
                     macos::attach_to_desktop_layer_with_interaction(ptr, ignore_cursor)
@@ -205,10 +219,18 @@ fn apply_windows_layer(
     Ok(())
 }
 
-fn resolve_note_ignore_cursor(
+/// Whether a note lets the cursor through to what is below it. Must match
+/// `resolveNoteIgnoreCursor` in `src/lib/note/note-interaction-policy.js`.
+///
+/// Global operation and topmost notes take the cursor. Wallpaper-layer notes always let it
+/// through: on Windows and macOS they sit under the desktop icons, where clicks never
+/// arrive. Desktop-layer notes let it through unless `desktop_selectable` (the
+/// `desktopStickiesSelectable` preference) asks for selectable text.
+pub(crate) fn resolve_note_ignore_cursor(
     is_always_on_top: bool,
     is_wallpaper: bool,
     interaction_disabled: bool,
+    desktop_selectable: bool,
 ) -> bool {
     if !interaction_disabled {
         return false;
@@ -219,7 +241,7 @@ fn resolve_note_ignore_cursor(
     if is_wallpaper {
         return true;
     }
-    true
+    !desktop_selectable
 }
 
 pub(super) fn get_overlay_interaction_disabled(app: &tauri::AppHandle) -> bool {
@@ -229,4 +251,28 @@ pub(super) fn get_overlay_interaction_disabled(app: &tauri::AppHandle) -> bool {
         }
     }
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_note_ignore_cursor;
+
+    #[test]
+    fn desktop_notes_let_clicks_through_unless_selectable() {
+        assert!(resolve_note_ignore_cursor(false, false, true, false));
+        assert!(!resolve_note_ignore_cursor(false, false, true, true));
+    }
+
+    #[test]
+    fn wallpaper_notes_always_let_clicks_through() {
+        assert!(resolve_note_ignore_cursor(false, true, true, false));
+        assert!(resolve_note_ignore_cursor(false, true, true, true));
+    }
+
+    #[test]
+    fn topmost_notes_and_global_operation_take_the_cursor() {
+        assert!(!resolve_note_ignore_cursor(true, false, true, false));
+        assert!(!resolve_note_ignore_cursor(false, true, false, false));
+        assert!(!resolve_note_ignore_cursor(false, false, false, false));
+    }
 }

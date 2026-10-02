@@ -251,6 +251,7 @@ export async function loadWorkspacePreferences(invoke) {
     locale: resolveAppLocale(prefs.language || DEFAULT_LOCALE),
     overlayEnabled: prefs.overlayEnabled ?? true,
     showPanelOnStartup: prefs.showPanelOnStartup ?? false,
+    desktopStickiesSelectable: prefs.desktopStickiesSelectable ?? false,
     workspaceZoom: normalizeWorkspaceZoom(prefs.workspaceZoom),
     workspaceZoomMode: normalizeWorkspaceZoomMode(prefs.workspaceZoomMode),
     workspaceFontSize: normalizeWorkspaceFontSize(prefs.workspaceFontSize),

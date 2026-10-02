@@ -16,8 +16,8 @@ pub(crate) use sticky::{
     get_overlay_interaction, hide_active_topmost_editing_sticky, hide_note_to_edge, layer_debug,
     mark_active_topmost_editing_sticky, move_note_window_without_activation,
     normalize_note_window_position, pin_window_to_desktop, reveal_note_from_edge,
-    set_note_auto_hide_enabled, set_note_window_reserve, set_note_window_size,
-    shortcut_hide_or_reveal, sync_all_note_window_layers, sync_note_window_layer,
+    set_note_auto_hide_enabled, set_note_window_ignore_cursor, set_note_window_reserve,
+    set_note_window_size, shortcut_hide_or_reveal, sync_all_note_window_layers, sync_note_window_layer,
     toggle_hidden_stickies, toggle_overlay_interaction, toggle_wallpaper_layer_and_apply,
     toggle_z_order_and_apply, unpin_window_from_desktop,
 };

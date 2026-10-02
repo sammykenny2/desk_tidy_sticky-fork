@@ -27,6 +27,7 @@ import {
   clampNoteOpacity,
 } from "../../src/lib/note/note-style-actions.js";
 import { resolveNoteSurfaceAlpha } from "../../src/lib/note/note-theme.js";
+import { resolveNoteIgnoreCursor } from "../../src/lib/note/note-interaction-policy.js";
 import { applyStructuralTextChange } from "../../src/lib/note/block-structural-commit.js";
 
 function createStructuralCommitHarness(saveResult) {
@@ -461,4 +462,28 @@ test("a surface-relative release does not reapply the last applied pointer posit
 
   assert.deepEqual(moves, [{ x: 136, y: 200 }]);
   assert.deepEqual(persisted, [{ x: 136, y: 200 }]);
+});
+
+test("desktop stickies let clicks through unless selectable text is enabled", () => {
+  const desktop = { globalControlDisabled: true, isAlwaysOnTop: false, isWallpaper: false };
+  assert.equal(resolveNoteIgnoreCursor({ ...desktop, desktopStickiesSelectable: false }), true);
+  assert.equal(resolveNoteIgnoreCursor({ ...desktop, desktopStickiesSelectable: true }), false);
+});
+
+test("wallpaper stickies always let clicks through", () => {
+  const wallpaper = { globalControlDisabled: true, isAlwaysOnTop: false, isWallpaper: true };
+  assert.equal(resolveNoteIgnoreCursor({ ...wallpaper, desktopStickiesSelectable: false }), true);
+  assert.equal(resolveNoteIgnoreCursor({ ...wallpaper, desktopStickiesSelectable: true }), true);
+});
+
+test("topmost stickies and global operation take the cursor", () => {
+  const base = { isWallpaper: false, desktopStickiesSelectable: false };
+  assert.equal(
+    resolveNoteIgnoreCursor({ ...base, globalControlDisabled: true, isAlwaysOnTop: true }),
+    false,
+  );
+  assert.equal(
+    resolveNoteIgnoreCursor({ ...base, globalControlDisabled: false, isAlwaysOnTop: false }),
+    false,
+  );
 });

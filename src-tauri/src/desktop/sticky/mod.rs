@@ -28,6 +28,7 @@ pub use layer::apply_overlay_input_state;
 pub(crate) use layer::layer_debug;
 use layer::{
     apply_note_window_layer_with_interaction_by_label, get_overlay_interaction_disabled,
+    set_note_ignore_cursor,
 };
 pub use panel_window::{configure_note_panel_window, dismiss_note_window_by_label};
 
@@ -60,9 +61,14 @@ pub fn pin_window_to_desktop(
 
     #[cfg(target_os = "macos")]
     {
-        let interaction_disabled = get_overlay_interaction_disabled(&app);
+        let ignore_cursor = layer::resolve_note_ignore_cursor(
+            false,
+            false,
+            get_overlay_interaction_disabled(&app),
+            crate::preferences::read_desktop_stickies_selectable(),
+        );
         run_macos_window_op(&window, "macos_pin_attach_to_desktop_layer", move |ptr| {
-            macos::attach_to_desktop_layer_with_interaction(ptr, interaction_disabled)
+            macos::attach_to_desktop_layer_with_interaction(ptr, ignore_cursor)
         })?;
         Ok(())
     }
@@ -392,6 +398,16 @@ pub fn get_note_window_position(
         y: f64::from(position.y) / scale,
         surface_relative_pointer: false,
     })
+}
+
+/// Makes the calling note window ignore the cursor or take it again. The note page uses
+/// this on Linux, where the regular window call does not survive a layer-shell reconfigure.
+#[tauri::command]
+pub fn set_note_window_ignore_cursor(
+    window: tauri::WebviewWindow,
+    ignore: bool,
+) -> Result<(), String> {
+    set_note_ignore_cursor(&window, ignore)
 }
 
 /// Resizes a note window to a logical size. A layer-shell note on Linux ignores the

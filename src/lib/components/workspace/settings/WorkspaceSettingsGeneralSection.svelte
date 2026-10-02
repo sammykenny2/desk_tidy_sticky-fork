@@ -10,6 +10,7 @@
     isAutostartEnabled = false,
     autostartAvailable = false,
     showPanelOnStartup = false,
+    desktopStickiesSelectable = false,
     shortcutSettings,
     shortcutSettingsSaving = false,
     pomodoroFocusMinutes = 25,
@@ -98,6 +99,23 @@
           onchange={(e) => {
             const checked = /** @type {HTMLInputElement} */ (e.currentTarget).checked;
             onSavePrefs({ showPanelOnStartup: checked });
+          }}
+        />
+        <span class="toggle-slider"></span>
+      </span>
+    </label>
+
+    <label class="setting-toggle">
+      <span class="setting-toggle-copy">
+        <span class="setting-toggle-title">{strings.desktopStickiesSelectable}</span>
+      </span>
+      <span class="toggle-switch">
+        <input
+          type="checkbox"
+          checked={desktopStickiesSelectable}
+          onchange={(e) => {
+            const checked = /** @type {HTMLInputElement} */ (e.currentTarget).checked;
+            onSavePrefs({ desktopStickiesSelectable: checked });
           }}
         />
         <span class="toggle-slider"></span>

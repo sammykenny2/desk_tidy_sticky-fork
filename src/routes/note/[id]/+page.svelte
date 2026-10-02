@@ -22,6 +22,8 @@
     resolveNoteId,
   } from "$lib/note/note-window-actions.js";
   import { createNoteWindowDragController } from "$lib/note/note-window-drag.js";
+  import { resolveNoteIgnoreCursor } from "$lib/note/note-interaction-policy.js";
+  import { listenPreferencesChanged } from "$lib/preferences/preferences-sync.js";
   import { isLinuxDesktop } from "$lib/runtime/platform.js";
   import { createStickyEdgeRevealController } from "$lib/note/sticky-edge-reveal.js";
   import {
@@ -53,6 +55,7 @@
   const noteId = $derived(String($page.params.id || ""));
   let text = $state("");
   let globalControlDisabled = $state(false);
+  let desktopStickiesSelectable = $state(false);
   /** @type {string} */
   let locale = $state(resolveAppLocale());
   let showPalette = $state(false);
@@ -563,12 +566,13 @@
     }
   }
 
-  async function loadLocale() {
+  async function loadPreferences() {
     try {
       const prefs = await invoke("get_preferences");
       locale = resolveAppLocale(prefs?.language);
+      desktopStickiesSelectable = prefs?.desktopStickiesSelectable ?? false;
     } catch (e) {
-      console.error("loadLocale", e);
+      console.error("loadPreferences", e);
     }
   }
 
@@ -637,9 +641,19 @@
   }
 
   async function applyInteractionPolicy() {
-    const ignoreCursor = !globalControlDisabled ? false : !(note?.isAlwaysOnTop);
+    const ignoreCursor = resolveNoteIgnoreCursor({
+      globalControlDisabled,
+      isAlwaysOnTop: !!note?.isAlwaysOnTop,
+      isWallpaper: !!note?.isWallpaper,
+      desktopStickiesSelectable,
+    });
     try {
-      await getCurrentWindow().setIgnoreCursorEvents(ignoreCursor);
+      // On Linux the regular call is undone when the note's layer surface is reconfigured.
+      if (linuxDesktop) {
+        await invoke("set_note_window_ignore_cursor", { ignore: ignoreCursor });
+      } else {
+        await getCurrentWindow().setIgnoreCursorEvents(ignoreCursor);
+      }
     } catch (e) {
       console.error("applyInteractionPolicy", e);
     }
@@ -1360,8 +1374,16 @@
       }),
     );
 
+    unlistenPromises.push(
+      listenPreferencesChanged(async (updates) => {
+        if (typeof updates.desktopStickiesSelectable !== "boolean") return;
+        desktopStickiesSelectable = updates.desktopStickiesSelectable;
+        await applyInteractionPolicy();
+      }),
+    );
+
     void refreshNotesStorageRecoveryState();
-    loadLocale()
+    loadPreferences()
       .then(loadGlobalControlState)
       .then(() => loadNote())
       .then(async () => {
