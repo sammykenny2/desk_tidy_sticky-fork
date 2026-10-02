@@ -49,6 +49,7 @@ windows = { version = "0.58.0", features = ["Win32_Foundation", "Win32_Graphics_
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
+ksni = { version = "0.3", features = ["blocking"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.3"

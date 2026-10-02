@@ -34,3 +34,5 @@ pub(crate) use startup::is_autostart_available;
 mod shortcuts;
 mod sticky;
 mod tray;
+#[cfg(target_os = "linux")]
+mod tray_linux;
