@@ -25,12 +25,18 @@
     onSetViewMode,
     stickiesVisible,
     globalControlDisabled = false,
+    desktopStickiesSelectable = false,
     showMacTrafficLights = false,
     focusDeadlines = [],
     onDeadlineAction = () => {},
     onToggleStickiesVisibility = () => {},
     onToggleGlobalControl = () => {},
+    onToggleDesktopStickiesSelectable = () => {},
   } = $props();
+
+  // Text selection only applies to stickies left on the desktop layer: hidden stickies and
+  // global operation (which makes every sticky interactive) both take precedence.
+  const desktopSelectableOverridden = $derived(!stickiesVisible || !globalControlDisabled);
 
   const mainTabs = $derived(getWorkspaceMainTabDefs(strings));
 
@@ -130,6 +136,23 @@
     >
       {#if !collapsed}
         <span class="footer-toggle-label">{strings.overlayClickThrough}</span>
+      {/if}
+      <span class="footer-switch" aria-hidden="true"><span class="footer-switch-knob"></span></span>
+    </button>
+    <button
+      type="button"
+      class="footer-toggle"
+      class:active={desktopStickiesSelectable}
+      class:overridden={desktopSelectableOverridden}
+      title={desktopStickiesSelectable
+        ? strings.desktopStickiesSelectableStateOn
+        : strings.desktopStickiesSelectableStateOff}
+      aria-label={strings.desktopStickiesSelectableShort}
+      aria-pressed={desktopStickiesSelectable}
+      onclick={() => onToggleDesktopStickiesSelectable()}
+    >
+      {#if !collapsed}
+        <span class="footer-toggle-label">{strings.desktopStickiesSelectableShort}</span>
       {/if}
       <span class="footer-switch" aria-hidden="true"><span class="footer-switch-knob"></span></span>
     </button>
@@ -358,6 +381,10 @@
 
   .footer-toggle.active {
     color: var(--ws-text-strong, #101828);
+  }
+
+  .footer-toggle.overridden {
+    opacity: 0.5;
   }
 
   .footer-toggle-label {

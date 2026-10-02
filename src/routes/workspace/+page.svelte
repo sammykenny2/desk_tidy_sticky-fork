@@ -438,6 +438,11 @@
   });
   const { loadPrefs, savePrefs } = routePreferences;
 
+  async function toggleDesktopStickiesSelectable() {
+    desktopStickiesSelectable = !desktopStickiesSelectable;
+    await savePrefs({ desktopStickiesSelectable });
+  }
+
   const workspaceStorageActions = createWorkspaceStorageActions({
     onImported: () => loadNotes(),
     invoke,
@@ -939,10 +944,12 @@
     {noteViewCounts}
     {stickiesVisible}
     {globalControlDisabled}
+    {desktopStickiesSelectable}
     focusDeadlines={deadlineTasks}
     onDeadlineAction={handleDeadlineAction}
     onToggleStickiesVisibility={toggleStickiesVisibility}
     onToggleGlobalControl={toggleGlobalControl}
+    onToggleDesktopStickiesSelectable={toggleDesktopStickiesSelectable}
   />
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="sidebar-splitter" onpointerdown={resizeController.startSidebarResize} ondblclick={() => (sidebarWidth = 260)}></div>
