@@ -94,8 +94,9 @@ make check
 | `make package` | 生成当前平台 Tauri bundle |
 | `make package-portable` | Windows 生成便携 zip，不主动结束运行中的程序 |
 | `make package-portable-stop` | Windows 生成便携 zip，并先结束运行中的 `desk_tidy_sticky.exe` |
+| `make package-deb` | Linux 生成 `.deb` 到 `release/`（已在 Raspberry Pi OS 验证） |
 
-Windows 开发、同步与打包细节见：`AGENTS.md`、`docs/build/make-commands.md`
+Windows 开发、同步与打包细节见：`AGENTS.md`、`docs/build/make-commands.md`；Linux（Raspberry Pi OS）见 `docs/build/2026-10-02-linux-deb.md`
 
 ## 参与开发
 

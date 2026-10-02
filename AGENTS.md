@@ -10,7 +10,7 @@ These rules apply to every coding agent working in this repository (Claude Code,
 
 ## Project
 
-Desk Tidy Sticky is a Tauri 2 desktop app with a SvelteKit/Svelte 5 frontend and a Rust backend. It provides desktop sticky notes and a "workstation" with notes, a focus timer and break control. Windows and macOS are the main targets. The Android/iOS shells (`src-tauri/gen/`) boot only the plugin commands. Linux builds, but `src-tauri/src/platform/` has no Linux desktop-layer implementation. The frontend is mostly plain JS type-checked through JSDoc (`jsconfig.json` sets `checkJs` and `strict`); the plugin runtime has a little TypeScript. The UI defaults to Simplified Chinese (`zh`), and most docs and error messages are in Chinese.
+Desk Tidy Sticky is a Tauri 2 desktop app with a SvelteKit/Svelte 5 frontend and a Rust backend. It provides desktop sticky notes and a "workstation" with notes, a focus timer and break control. Windows and macOS are the main targets. Linux is supported on Raspberry Pi OS (labwc/Wayland) and packaged as a `.deb`; see "Linux" under Platform caveats. The Android/iOS shells (`src-tauri/gen/`) boot only the plugin commands. The frontend is mostly plain JS type-checked through JSDoc (`jsconfig.json` sets `checkJs` and `strict`); the plugin runtime has a little TypeScript. The UI defaults to Simplified Chinese (`zh`), and most docs and error messages are in Chinese.
 
 ## Commands
 
@@ -29,6 +29,7 @@ Desk Tidy Sticky is a Tauri 2 desktop app with a SvelteKit/Svelte 5 frontend and
 | Release exe (no bundle) | `make build` | `pnpm tauri build --no-bundle` |
 | Platform bundle | `make package` | `pnpm tauri build` |
 | Windows portable zip | `make package-portable` (`-stop` variant kills a running `desk_tidy_sticky.exe` first) | `scripts/windows/build-portable-zip.ps1` |
+| Linux `.deb` into `release/` | `make package-deb` (`make package-deb-smoke` validates it) | `scripts/linux/build-deb.sh` (`--install-deps` installs the apt build packages) |
 
 Before committing, run `make check`, `make test` and `git diff --check`, and make sure they pass.
 
@@ -42,7 +43,7 @@ The app version appears in three places that must stay in sync: `package.json`, 
 
 ## Running the App Locally
 
-- **The dev app shares an installed release's identity and data.** It uses the same identifier (`com.desk-tidy.sticky`) and the same data directory (`directories::ProjectDirs("com", "desk_tidy", "desk_tidy_sticky")`, which on Windows is `%APPDATA%\desk_tidy\desk_tidy_sticky\data`). Quit any installed instance first: the single-instance plugin would otherwise just focus that instance, and the dev app exits. The dev app reads and writes the user's real `notes.json` and `preferences.json`.
+- **The dev app shares an installed release's identity and data.** It uses the same identifier (`com.desk-tidy.sticky`) and the same data directory (`directories::ProjectDirs("com", "desk_tidy", "desk_tidy_sticky")`, which on Windows is `%APPDATA%\desk_tidy\desk_tidy_sticky\data` and on Linux `~/.local/share/desk_tidy_sticky`). Quit any installed instance first: the single-instance plugin would otherwise just focus that instance, and the dev app exits. The dev app reads and writes the user's real `notes.json` and `preferences.json`.
 - **`pnpm tauri dev` watches `src-tauri/`.** It rebuilds and relaunches the app after every Rust change. Stopping the app ends the session. Before starting a new session, make sure no older `tauri dev`/`cargo` process is still running; an app it relaunches will hold the single instance and block the new one.
 - **Debugging sticky window layers.** Set `DESK_TIDY_LAYER_DEBUG=1` to print every sticky-window layer and input-state transition to stderr, including the window's actual parent and styles. Layer failures are otherwise silent, because the Win32 calls report success while the window ends up elsewhere.
 - **Preferences written by release 1.2.5 are zeroed.** Shortcuts are empty, which means disabled, and minute values are 0. Deleting `preferences.json` restores the current defaults. Break reminders are off by default; only an explicit `true` enables them.
@@ -78,7 +79,7 @@ Each pinned note has one of three layers:
 - `preferences/`: the frontend sends field patches, which are applied under a lock. Per-field serde defaults in `model.rs` are the first-run values and must match the frontend fallbacks (`p.x ?? true`). An existing empty value is kept as-is; it is not replaced by the default.
 - `markdown_storage/`: Markdown export/import of notes.
 - `desktop/`: tray, global shortcuts, panel windows, and sticky behavior (`sticky/`: layer and z-order, auto-hide to screen edge, display recovery, frost effects).
-- `platform/`: native code. Windows attaches notes to the desktop through WorkerW (`platform/windows/workerw`). macOS uses NSPanel through the vendored `vendor/tauri-nspanel` plus `macOSPrivateApi`.
+- `platform/`: native code. Windows attaches notes to the desktop through WorkerW (`platform/windows/workerw`). macOS uses NSPanel through the vendored `vendor/tauri-nspanel` plus `macOSPrivateApi`. Linux turns note windows into wlr-layer-shell surfaces (`platform/linux/note_surface.rs`).
 - `breaks/`: the break reminder watchdog and overlay presentation.
 - The autostart plugin is registered only in release builds (`#[cfg(not(debug_assertions))]`). The frontend checks `is_autostart_available` before using it.
 
@@ -104,6 +105,16 @@ Desktop layering is the most fragile area. It covers WorkerW, wallpaper and icon
 
 - On Windows 11 24H2+ (build 26200 verified), the wallpaper WorkerW is a child of `Progman` sitting behind `SHELLDLL_DefView`. A note embedded there is under the icon layer.
 - tao rewrites a window's whole style from its own flags on every `set_always_on_top`/`set_ignore_cursor_events` call. This drops the `WS_CHILD` that attach added, after which `GetParent` reports NULL even though the note is still inside WorkerW. To tell whether a window is embedded, use `GetAncestor(GA_PARENT)` (`workerw::read_parent`), never `GetParent`.
+
+#### Linux
+
+Verified on Raspberry Pi OS (Debian 13 trixie, arm64) with labwc and pcmanfm's desktop, WebKitGTK 2.54. Root causes and evidence: `docs/issues/2026-10-02-linux-webkitgtk-layer-shell.md`. Build and install: `docs/build/2026-10-02-linux-deb.md`.
+
+- A Wayland toplevel cannot place itself or pick a stacking layer, and labwc refuses XWayland always-on-top by default. On a compositor with wlr-layer-shell, `configure_note_panel_window` turns each note window into a layer surface before it is realized: Bottom is the desktop layer (above pcmanfm's icons, below windows), Top is topmost and global operation, Background stands in for the wallpaper layer (pcmanfm draws wallpaper and icons on one surface, so nothing fits under the icons). `DESK_TIDY_LAYER_SHELL=0` keeps notes as regular windows. Without layer-shell (X11, GNOME) the generic `set_always_on_top` fallback applies.
+- A layer surface reports no position (`outer_position` is 0, 0), ignores `set_position`/`set_size`, and takes its size from the GTK size request. `platform/linux/note_surface.rs` tracks each note's logical geometry; the frontend reads and changes it through `get_note_window_position` and `set_note_window_size`, and `move_note_window_without_activation` moves it. Pointer `screenX` is relative to the surface there, so the drag controller keeps a fixed grab point (`surfaceRelativePointer`).
+- A WebKitGTK window created `transparent` or with a fully transparent `backgroundColor` repaints only damaged regions after it is shown again or reconfigured, leaving the rest blank or stale. On Linux the main panel (`tauri.linux.conf.json`), the workspace and note windows are created without either. `main.rs` sets `WEBKIT_DISABLE_DMABUF_RENDERER=1` unless the user set it, because the DMA-BUF renderer draws garbled frames on the Pi's GPU.
+- Global shortcuts go through an X11 key grab and do not see keys typed into Wayland windows. A second launch with `--toggle-panel`, `--toggle-global-operation`, `--hide-or-reveal-stickies` or `--quit` runs that action in the running instance (`run_command_line_action`); bind these in labwc's `rc.xml`.
+- wf-panel-pi does not draw the tray icon. The StatusNotifierItem is registered, but libayatana publishes an absolute PNG path as `IconName` and no `IconPixmap`; wf-panel-pi only draws theme icon names and pixmaps. Use the command-line actions to open the panel or quit.
 
 ## Docs and Project Tracking
 

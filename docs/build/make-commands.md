@@ -23,6 +23,8 @@
 | `make package` | 支持 | 支持 | 执行 `pnpm tauri build`，生成当前平台 bundle |
 | `make package-portable` | 不支持 | 支持 | 生成 Windows portable zip，不主动结束正在运行的程序 |
 | `make package-portable-stop` | 不支持 | 支持 | 生成 Windows portable zip，并先结束 `desk_tidy_sticky.exe` |
+| `make package-deb` | 不支持 | 不支持 | 仅 Linux：执行 `scripts/linux/build-deb.sh`，生成 `release/DeskTidySticky-<版本>-<架构>.deb` |
+| `make package-deb-smoke` | 不支持 | 不支持 | 仅 Linux：执行 `scripts/linux/test-deb-smoke.sh`，检查 `release/` 中的 `.deb` |
 | `make clean` | 支持 | 支持 | 删除本地构建产物 |
 
 ## 脚本边界
@@ -31,6 +33,7 @@
 - macOS / POSIX 逻辑在 `scripts/make/task.sh`。
 - Windows 逻辑在 `scripts/make/task.ps1`。
 - Windows portable zip 的实际组装继续由 `scripts/windows/build-portable-zip.ps1` 负责。
+- Linux `.deb` 由 `scripts/linux/build-deb.sh` 构建，细节见 [Linux .deb 打包](2026-10-02-linux-deb.md)。
 
 ## 工具版本
 
