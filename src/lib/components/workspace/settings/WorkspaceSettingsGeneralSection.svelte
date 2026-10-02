@@ -108,6 +108,7 @@
     <label class="setting-toggle">
       <span class="setting-toggle-copy">
         <span class="setting-toggle-title">{strings.desktopStickiesSelectable}</span>
+        <span class="setting-toggle-hint">{strings.desktopStickiesSelectableHint}</span>
       </span>
       <span class="toggle-switch">
         <input

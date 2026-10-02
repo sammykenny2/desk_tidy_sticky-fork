@@ -189,7 +189,7 @@
           </label>
 
           <label class="setting-item">
-            <span class="setting-label">{strings.desktopStickiesSelectable}</span>
+            <span class="setting-label" title={strings.desktopStickiesSelectableHint}>{strings.desktopStickiesSelectable}</span>
             <div class="toggle-switch">
               <input
                 type="checkbox"

@@ -8,6 +8,7 @@
   import WorkspaceSidebarDeadlines from "$lib/components/workspace/sidebar/WorkspaceSidebarDeadlines.svelte";
   import WorkspaceSidebarModules from "$lib/components/workspace/sidebar/WorkspaceSidebarModules.svelte";
   import WorkspaceSidebarNoteFilters from "$lib/components/workspace/sidebar/WorkspaceSidebarNoteFilters.svelte";
+  import { resolveDesktopSelectableOverride } from "$lib/note/note-interaction-policy.js";
 
   let {
     strings,
@@ -26,6 +27,7 @@
     stickiesVisible,
     globalControlDisabled = false,
     desktopStickiesSelectable = false,
+    notes = [],
     showMacTrafficLights = false,
     focusDeadlines = [],
     onDeadlineAction = () => {},
@@ -35,8 +37,24 @@
   } = $props();
 
   // Text selection only applies to stickies left on the desktop layer: hidden stickies and
-  // global operation (which makes every sticky interactive) both take precedence.
-  const desktopSelectableOverridden = $derived(!stickiesVisible || !globalControlDisabled);
+  // global operation (which makes every sticky interactive) both take precedence, and with
+  // every pinned sticky on the wallpaper layer or topmost there is nothing for it to change.
+  const desktopSelectableOverride = $derived(
+    resolveDesktopSelectableOverride({ stickiesVisible, globalControlDisabled, notes }),
+  );
+  /** @type {Record<string, string>} */
+  const DESKTOP_SELECTABLE_OVERRIDE_STRING_KEYS = {
+    stickiesHidden: "desktopStickiesSelectableStickiesHidden",
+    globalOperation: "desktopStickiesSelectableGlobalOperation",
+    noDesktopStickies: "desktopStickiesSelectableNoDesktopStickies",
+  };
+  const desktopSelectableTitle = $derived.by(() => {
+    const state = desktopStickiesSelectable
+      ? strings.desktopStickiesSelectableStateOn
+      : strings.desktopStickiesSelectableStateOff;
+    if (!desktopSelectableOverride) return state;
+    return `${state}\n${strings[DESKTOP_SELECTABLE_OVERRIDE_STRING_KEYS[desktopSelectableOverride]]}`;
+  });
 
   const mainTabs = $derived(getWorkspaceMainTabDefs(strings));
 
@@ -143,10 +161,8 @@
       type="button"
       class="footer-toggle"
       class:active={desktopStickiesSelectable}
-      class:overridden={desktopSelectableOverridden}
-      title={desktopStickiesSelectable
-        ? strings.desktopStickiesSelectableStateOn
-        : strings.desktopStickiesSelectableStateOff}
+      class:overridden={!!desktopSelectableOverride}
+      title={desktopSelectableTitle}
       aria-label={strings.desktopStickiesSelectableShort}
       aria-pressed={desktopStickiesSelectable}
       onclick={() => onToggleDesktopStickiesSelectable()}

@@ -27,7 +27,10 @@ import {
   clampNoteOpacity,
 } from "../../src/lib/note/note-style-actions.js";
 import { resolveNoteSurfaceAlpha } from "../../src/lib/note/note-theme.js";
-import { resolveNoteIgnoreCursor } from "../../src/lib/note/note-interaction-policy.js";
+import {
+  resolveDesktopSelectableOverride,
+  resolveNoteIgnoreCursor,
+} from "../../src/lib/note/note-interaction-policy.js";
 import { applyStructuralTextChange } from "../../src/lib/note/block-structural-commit.js";
 
 function createStructuralCommitHarness(saveResult) {
@@ -485,5 +488,46 @@ test("topmost stickies and global operation take the cursor", () => {
   assert.equal(
     resolveNoteIgnoreCursor({ ...base, globalControlDisabled: false, isAlwaysOnTop: false }),
     false,
+  );
+});
+
+test("the selectable-text switch applies while a pinned sticky is on the desktop layer", () => {
+  const notes = [
+    { isPinned: true, isWallpaper: true },
+    { isPinned: true, isAlwaysOnTop: false, isWallpaper: false },
+  ];
+  assert.equal(
+    resolveDesktopSelectableOverride({ stickiesVisible: true, globalControlDisabled: true, notes }),
+    null,
+  );
+});
+
+test("the selectable-text switch has no effect without a desktop-layer sticky", () => {
+  const visible = { stickiesVisible: true, globalControlDisabled: true };
+  assert.equal(resolveDesktopSelectableOverride({ ...visible, notes: [] }), "noDesktopStickies");
+  assert.equal(
+    resolveDesktopSelectableOverride({
+      ...visible,
+      notes: [
+        { isPinned: true, isWallpaper: true },
+        { isPinned: true, isAlwaysOnTop: true },
+        { isPinned: false },
+        { isPinned: true, isArchived: true },
+        { isPinned: true, isDeleted: true },
+      ],
+    }),
+    "noDesktopStickies",
+  );
+});
+
+test("hidden stickies and global operation override the selectable-text switch", () => {
+  const notes = [{ isPinned: true }];
+  assert.equal(
+    resolveDesktopSelectableOverride({ stickiesVisible: false, globalControlDisabled: false, notes }),
+    "stickiesHidden",
+  );
+  assert.equal(
+    resolveDesktopSelectableOverride({ stickiesVisible: true, globalControlDisabled: false, notes }),
+    "globalOperation",
   );
 });

@@ -2,6 +2,7 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
 import { applyNoSnapWhenReady } from "$lib/panel/window-effects.js";
 import { applyNoteWindowNativeEffects } from "$lib/note/note-native-effects.js";
+import { hasStickyWindow } from "$lib/note/note-interaction-policy.js";
 import { isLinuxDesktop } from "$lib/runtime/platform.js";
 
 /**
@@ -267,7 +268,7 @@ export function createWindowSync(deps) {
     }
 
     const notes = deps.getNotes();
-    const activeNotes = notes.filter((n) => n.isPinned && !n.isArchived && !n.isDeleted);
+    const activeNotes = notes.filter(hasStickyWindow);
     const shouldExist = new Set(
       activeNotes.map((n) => `note-${n.id}`),
     );

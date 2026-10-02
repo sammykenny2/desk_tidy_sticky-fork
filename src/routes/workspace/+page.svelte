@@ -945,6 +945,7 @@
     {stickiesVisible}
     {globalControlDisabled}
     {desktopStickiesSelectable}
+    {notes}
     focusDeadlines={deadlineTasks}
     onDeadlineAction={handleDeadlineAction}
     onToggleStickiesVisibility={toggleStickiesVisibility}
