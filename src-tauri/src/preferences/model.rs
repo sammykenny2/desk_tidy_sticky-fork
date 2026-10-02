@@ -81,7 +81,9 @@ pub struct PanelPreferences {
     pub pomodoro_task_start_reminder_enabled: bool,
     #[serde(default = "default_pomodoro_task_start_reminder_lead_minutes")]
     pub pomodoro_task_start_reminder_lead_minutes: i32,
-    #[serde(default = "default_true")]
+    // Off until the user turns it on: a first run otherwise gets a full-screen break overlay
+    // every few minutes. The workspace frontend treats only an explicit `true` as enabled.
+    #[serde(default = "default_false")]
     pub pomodoro_break_reminder_enabled: bool,
     #[serde(default = "default_pomodoro_mini_break_postpone_minutes")]
     pub pomodoro_mini_break_postpone_minutes: i32,

@@ -35,7 +35,7 @@ const DEFAULT_WORKSPACE_FONT_SIZE = "medium";
 const DEFAULT_WORKSPACE_SIDEBAR_LAYOUT_MODE = "auto";
 const DEFAULT_WORKSPACE_SIDEBAR_MANUAL_SPLIT_RATIO = DEFAULT_SIDEBAR_MANUAL_SPLIT_RATIO;
 const DEFAULT_POMODORO = {
-  breakReminderEnabled: true,
+  breakReminderEnabled: false,
   focusMinutes: 25,
   shortBreakMinutes: 5,
   longBreakMinutes: 15,
@@ -109,7 +109,7 @@ export function normalizePomodoroConfig(input) {
     return Math.max(min, Math.min(max, Math.round(n)));
   };
   return {
-    breakReminderEnabled: raw.breakReminderEnabled !== false,
+    breakReminderEnabled: raw.breakReminderEnabled === true,
     focusMinutes: clamp(raw.focusMinutes, DEFAULT_POMODORO.focusMinutes, 5, 90),
     shortBreakMinutes: clamp(raw.shortBreakMinutes, DEFAULT_POMODORO.shortBreakMinutes, 1, 30),
     longBreakMinutes: clamp(raw.longBreakMinutes, DEFAULT_POMODORO.longBreakMinutes, 5, 60),

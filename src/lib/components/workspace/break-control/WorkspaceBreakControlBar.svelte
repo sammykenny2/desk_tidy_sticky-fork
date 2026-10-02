@@ -5,7 +5,7 @@
     strings,
     breakActive = false,
     canSkip = false,
-    breakReminderEnabled = true,
+    breakReminderEnabled = false,
     nextMiniBreakText = "00:00",
     nextLongBreakText = "00:00",
     independentMiniBreakEveryMinutes = 10,

@@ -45,7 +45,7 @@ The app version appears in three places that must stay in sync: `package.json`, 
 - **The dev app shares an installed release's identity and data.** It uses the same identifier (`com.desk-tidy.sticky`) and the same data directory (`directories::ProjectDirs("com", "desk_tidy", "desk_tidy_sticky")`, which on Windows is `%APPDATA%\desk_tidy\desk_tidy_sticky\data`). Quit any installed instance first: the single-instance plugin would otherwise just focus that instance, and the dev app exits. The dev app reads and writes the user's real `notes.json` and `preferences.json`.
 - **`pnpm tauri dev` watches `src-tauri/`.** It rebuilds and relaunches the app after every Rust change. Stopping the app ends the session. Before starting a new session, make sure no older `tauri dev`/`cargo` process is still running; an app it relaunches will hold the single instance and block the new one.
 - **Debugging sticky window layers.** Set `DESK_TIDY_LAYER_DEBUG=1` to print every sticky-window layer and input-state transition to stderr, including the window's actual parent and styles. Layer failures are otherwise silent, because the Win32 calls report success while the window ends up elsewhere.
-- **Preferences written by release 1.2.5 are zeroed.** Shortcuts are empty, which means disabled, and minute values are 0. Deleting `preferences.json` restores the current defaults. Note that the defaults include break reminders, which are on.
+- **Preferences written by release 1.2.5 are zeroed.** Shortcuts are empty, which means disabled, and minute values are 0. Deleting `preferences.json` restores the current defaults. Break reminders are off by default; only an explicit `true` enables them.
 
 ## Architecture
 
