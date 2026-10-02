@@ -41,6 +41,8 @@ Desk Tidy Sticky make targets
   make build                  Build the Tauri release executable without bundling
   make build-frontend         Build the frontend only
   make package                Build the platform bundle with Tauri
+  make package-deb            Linux only: build the .deb into release/
+  make package-deb-smoke      Linux only: validate the .deb in release/
   make package-portable       Windows only: build portable zip without stopping a running app
   make package-portable-stop  Windows only: stop a running app, then build portable zip
   make clean                  Remove local build outputs
@@ -84,12 +86,18 @@ EOF
   package)
     run_pnpm tauri build
     ;;
+  package-deb)
+    bash scripts/linux/build-deb.sh
+    ;;
+  package-deb-smoke)
+    bash scripts/linux/test-deb-smoke.sh
+    ;;
   package-portable|package-portable-stop)
     echo "The portable zip target is Windows-only. Run this target on Windows." >&2
     exit 2
     ;;
   clean)
-    rm -rf build .svelte-kit package src-tauri/target
+    rm -rf build .svelte-kit package release src-tauri/target
     ;;
   *)
     echo "Unknown make task: $task" >&2

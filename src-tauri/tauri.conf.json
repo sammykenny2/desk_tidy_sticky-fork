@@ -43,6 +43,13 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "linux": {
+      "deb": {
+        "depends": ["libgtk-layer-shell0", "libayatana-appindicator3-1"],
+        "section": "utils",
+        "desktopTemplate": "linux/desk_tidy_sticky.desktop"
+      }
+    }
   }
 }
