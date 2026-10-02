@@ -105,6 +105,7 @@ Desktop layering is the most fragile area. It covers WorkerW, wallpaper and icon
 
 - On Windows 11 24H2+ (build 26200 verified), the wallpaper WorkerW is a child of `Progman` sitting behind `SHELLDLL_DefView`. A note embedded there is under the icon layer.
 - tao rewrites a window's whole style from its own flags on every `set_always_on_top`/`set_ignore_cursor_events` call. This drops the `WS_CHILD` that attach added, after which `GetParent` reports NULL even though the note is still inside WorkerW. To tell whether a window is embedded, use `GetAncestor(GA_PARENT)` (`workerw::read_parent`), never `GetParent`.
+- Transparent pixels in an embedded note do not show the desktop correctly, so CSS alone cannot round a Windows note. Note windows are clipped with a native rounded window region (`desktop/sticky/corners.rs`), reapplied after every layer change and on `Resized`/`ScaleFactorChanged`, because a region does not follow the window size. Without one, Windows gives an embedded note the legacy themed caption region, which rounds only the top corners. Keep the radius equal to `noteWindowRadius` in the note route.
 
 #### Linux
 

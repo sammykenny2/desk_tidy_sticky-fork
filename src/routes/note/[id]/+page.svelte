@@ -113,7 +113,9 @@
   const linuxDesktop = isLinuxDesktop();
   const noteSurfaceAlpha = $derived(resolveNoteSurfaceAlpha(noteOpacity, noteFrost));
   const noteBackground = $derived(hexToRgba(noteBgColor, noteSurfaceAlpha));
-  const noteWindowRadius = $derived(isWindows ? "0px" : "12px");
+  // On Windows the native window region clips the note to the same radius
+  // (NOTE_CORNER_RADIUS in src-tauri/src/desktop/sticky/corners.rs).
+  const noteWindowRadius = "12px";
   const canInteract = $derived(!globalControlDisabled || !!note?.isAlwaysOnTop);
   const isEffectiveTopmost = $derived(!!note?.isAlwaysOnTop || !globalControlDisabled);
   const isPinnedTopmostSticky = $derived(!!note?.isPinned && !!note?.isAlwaysOnTop);
@@ -1680,7 +1682,6 @@
   }
 
   .note-window.windows-flat {
-    --note-radius: 0px;
     background: var(--note-tint, transparent);
     filter: none;
   }

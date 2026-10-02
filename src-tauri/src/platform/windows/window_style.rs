@@ -1,10 +1,11 @@
 use std::ffi::c_void;
-use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::{HWND, RECT};
+use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, DeleteObject, SetWindowRgn};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetAncestor, GetDesktopWindow, GetWindowLongPtrW, IsWindow, SetWindowLongPtrW, SetWindowPos,
-    GA_PARENT, GWL_STYLE, HWND_BOTTOM, HWND_NOTOPMOST, HWND_TOP, HWND_TOPMOST, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW, WS_MAXIMIZEBOX,
-    WS_THICKFRAME,
+    GetAncestor, GetDesktopWindow, GetWindowLongPtrW, GetWindowRect, IsWindow, SetWindowLongPtrW,
+    SetWindowPos, GA_PARENT, GWL_STYLE, HWND_BOTTOM, HWND_NOTOPMOST, HWND_TOP, HWND_TOPMOST,
+    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW,
+    WS_MAXIMIZEBOX, WS_THICKFRAME,
 };
 
 pub fn set_topmost_no_activate(hwnd_isize: isize, topmost: bool) -> Result<(), String> {
@@ -58,6 +59,33 @@ pub fn send_window_to_bottom_if_top_level(hwnd_isize: isize) -> Result<(), Strin
         let flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW | SWP_FRAMECHANGED;
         let _ = SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags);
         let _ = SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, flags);
+    }
+    Ok(())
+}
+
+/// Clips the window to a rounded rectangle over its current bounds, `radius` physical pixels
+/// at each corner. The region does not follow later resizes; the caller reapplies it.
+pub fn set_rounded_window_region(hwnd_isize: isize, radius: i32) -> Result<(), String> {
+    let hwnd = HWND(hwnd_isize as *mut c_void);
+    unsafe {
+        if hwnd.0.is_null() || !IsWindow(hwnd).as_bool() {
+            return Err("set_rounded_window_region target hwnd invalid".to_string());
+        }
+
+        let mut rect = RECT::default();
+        GetWindowRect(hwnd, &mut rect).map_err(|e| e.to_string())?;
+        let width = rect.right - rect.left;
+        let height = rect.bottom - rect.top;
+        // CreateRoundRectRgn leaves out the right and bottom edges, hence the extra pixel.
+        let region = CreateRoundRectRgn(0, 0, width + 1, height + 1, radius * 2, radius * 2);
+        if region.is_invalid() {
+            return Err("CreateRoundRectRgn failed".to_string());
+        }
+        // On success the system owns the region; delete it only if it was not taken.
+        if SetWindowRgn(hwnd, region, true) == 0 {
+            let _ = DeleteObject(region);
+            return Err("SetWindowRgn failed".to_string());
+        }
     }
     Ok(())
 }

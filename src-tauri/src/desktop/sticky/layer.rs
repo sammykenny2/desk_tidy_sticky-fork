@@ -8,6 +8,8 @@ use crate::platform::{window_hwnd_isize, windows};
 use crate::runtime::GlobalControlState;
 use tauri::Manager;
 
+#[cfg(target_os = "windows")]
+use super::corners::round_note_window_corners;
 use super::effects::apply_note_window_frost_by_label;
 
 /// `DESK_TIDY_LAYER_DEBUG=1` prints every note-window layer and input-state transition to
@@ -216,7 +218,7 @@ fn apply_windows_layer(
             windows::attach_to_worker_w(hwnd_isize)?;
         }
     }
-    Ok(())
+    round_note_window_corners(w, hwnd_isize)
 }
 
 /// Whether a note lets the cursor through to what is below it. Must match

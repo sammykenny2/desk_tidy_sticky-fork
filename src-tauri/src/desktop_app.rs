@@ -233,8 +233,15 @@ pub fn run() {
 
         #[cfg(target_os = "windows")]
         if let tauri::RunEvent::WindowEvent { label, event, .. } = event {
-            if matches!(event, tauri::WindowEvent::Moved(_)) {
-                desktop::schedule_hidden_note_recovery(app_handle, &label);
+            match event {
+                tauri::WindowEvent::Moved(_) => {
+                    desktop::schedule_hidden_note_recovery(app_handle, &label);
+                }
+                // A note's rounded window region does not follow size or DPI changes.
+                tauri::WindowEvent::Resized(_) | tauri::WindowEvent::ScaleFactorChanged { .. } => {
+                    desktop::round_note_window_corners_by_label(app_handle, &label);
+                }
+                _ => {}
             }
         }
 

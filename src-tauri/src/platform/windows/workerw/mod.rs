@@ -1,6 +1,5 @@
 use std::ffi::c_void;
 use windows::Win32::Foundation::{GetLastError, SetLastError, HWND, WIN32_ERROR};
-use windows::Win32::Graphics::Gdi::{SetWindowRgn, HRGN};
 use windows::Win32::UI::WindowsAndMessaging::{
     GetAncestor, GetDesktopWindow, GetWindowLongPtrW, IsWindow, SetParent,
     SetWindowLongPtrW, SetWindowPos, GA_PARENT, GWL_EXSTYLE, GWL_STYLE, HWND_BOTTOM,
@@ -117,12 +116,6 @@ pub fn describe_window(hwnd_isize: isize) -> String {
     }
 }
 
-fn clear_window_region(hwnd: HWND) {
-    unsafe {
-        let _ = SetWindowRgn(hwnd, HRGN(std::ptr::null_mut()), true);
-    }
-}
-
 fn apply_desktop_child_style(hwnd: HWND) {
     unsafe {
         let style = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32;
@@ -134,9 +127,6 @@ fn apply_desktop_child_style(hwnd: HWND) {
             let _ = SetWindowLongPtrW(hwnd, GWL_STYLE, next_style as isize);
             refresh_style(hwnd);
         }
-        // Windows 10 leaves visible transparent spikes around clipped WorkerW children.
-        // Keep the native region rectangular; CSS still controls the visible note surface.
-        clear_window_region(hwnd);
     }
 }
 
@@ -150,7 +140,6 @@ fn apply_top_level_style(hwnd: HWND) {
             let _ = SetWindowLongPtrW(hwnd, GWL_STYLE, next_style as isize);
             refresh_style(hwnd);
         }
-        clear_window_region(hwnd);
     }
 }
 
