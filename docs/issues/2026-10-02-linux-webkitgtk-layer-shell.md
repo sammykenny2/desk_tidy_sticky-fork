@@ -67,6 +67,14 @@ tao 处理 `set_ignore_cursor_events(true)` 时对 `window.window()` 直接 `unw
 
 处理：单实例回调支持命令行动作（`--toggle-panel`、`--toggle-global-operation`、`--hide-or-reveal-stickies`、`--quit`），可绑定到 labwc 的 `rc.xml` 快捷键；没有实例运行时 `--quit` 直接退出。用法见 `docs/build/2026-10-02-linux-deb.md`。
 
+### 1.8 切换层级后点击穿透失效（2026-10-03）
+
+现象：全局操作开启再关闭后，桌面层贴纸不再穿透，可在贴纸上选取文字、右键弹出 WebKit 菜单；刚启动时则正常（右键弹出 pcmanfm 桌面菜单）。
+
+根因：tao 在 Wayland 下为每个窗口装一个 header bar（`set_titlebar`），GTK 因此把它当作客户端装饰窗口，每次 size allocation 都会按 widget 自身的 input shape 重建 GdkWindow 的输入区域。tao 的 `set_ignore_cursor_events(true)` 直接把空区域写在 GdkWindow 上，layer surface 移动或换层触发的重新分配会把它覆盖成整窗可点击；启动时的顺序恰好先分配后设置，所以没暴露。
+
+处理：Linux 下把 input shape 设在 GTK widget 上（`set_note_ignore_cursor`，空区域 = 穿透，`None` = 接收鼠标），GTK 重建时会保留它；Rust 侧与贴纸页都改走这条路径（贴纸页用 `set_note_window_ignore_cursor` 命令）。另外 GDK 只在窗口下一帧提交时才把新的输入区域发给合成器，单纯改输入区域不会产生新帧（实测“桌面层贴纸可选取文字”开关切换后要等别的重绘才生效），所以改完后 `queue_draw()`。
+
 ## 2. 改动清单
 
 - Rust：`platform/linux/note_surface.rs`（新），`desktop/sticky/{panel_window,layer,mod,auto_hide,effects}.rs`，`notes/commands.rs`，`desktop/{panel,shortcuts,mod}.rs`，`desktop_app.rs`，`main.rs`；`Cargo.toml` 增加 Linux 专用依赖 `gtk 0.18`、`gtk-layer-shell 0.8`（feature `v0_6`）。

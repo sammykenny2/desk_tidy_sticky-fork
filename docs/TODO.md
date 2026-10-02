@@ -264,6 +264,16 @@
 
 首版已落地：layer-shell 贴纸、WebKitGTK 渲染规避、命令行动作（替代 Wayland 下的全局快捷键与托盘退出）、`make package-deb`，见[构建说明](build/2026-10-02-linux-deb.md)与[根因记录](issues/2026-10-02-linux-webkitgtk-layer-shell.md)。待处理：wf-panel-pi 不显示托盘图标；贴纸缺少程序内缩放手柄（边缘缩放不可用）；壁纸层无法在图标之下；双屏与休息遮罩未在 Wayland 下验证。
 
+### T-DESKTOP-SELECTABLE · 桌面层贴纸可选取文字选项
+
+<a id="t-desktop-selectable"></a>
+
+```tracking-task
+{"id":"T-DESKTOP-SELECTABLE","name":"桌面层贴纸可选取文字选项","goal":"用户可选择让桌面层贴纸接收鼠标以选取文字，而不必开启全局操作或置顶","scope":"偏好 desktopStickiesSelectable（默认关）、Rust 与前端统一穿透判定、设置面板开关；只影响桌面层，壁纸层仍穿透；不改变只读/拖动/编辑规则","acceptance":"默认行为不变；开启后三端桌面层贴纸可选取文字与复制，层级不变，覆盖区域不再穿透到桌面图标；切换即时生效；关闭后恢复穿透","dependencies":[],"version":"v1","mode":"lightweight","status":"in_progress","execution_ref":"ui/2026-02-07-overlay-interaction-topmost-policy.md","acceptance_evidence":["Linux（Raspberry Pi OS / labwc）实机验证；Windows、macOS 待实机验证"],"priority":"medium","unplanned_reason":"用户 2026-10-03 在 Linux 验收中提出"}
+```
+
+规则与实现见[交互策略补充](ui/2026-02-07-overlay-interaction-topmost-policy.md)。待办：Windows 上确认 WorkerW 内贴纸能选取文字并用 Ctrl+C 复制；macOS 上确认桌面层贴纸可点击且不抢焦点。
+
 ## Done
 
 ### T-PLUGIN-PLATFORM-VALIDATION · 跨端插件运行与分发可行性

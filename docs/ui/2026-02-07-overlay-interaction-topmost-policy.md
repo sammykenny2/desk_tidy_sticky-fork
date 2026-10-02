@@ -69,6 +69,17 @@
   - macOS 上显式设为“置顶”的贴纸，预期可覆盖普通全屏窗口场景。
   - 桌面层 / 壁纸层贴纸继续维持原有桌面语义，不会被一起提升到全屏辅助层。
 
+## 2026-10-03 补充：桌面层贴纸可选取文字（可选）
+- 需求：用户有时希望直接在桌面层贴纸上选取文字，而不必开启全局操作或把贴纸置顶。
+- 新增偏好 `desktopStickiesSelectable`（简洁模式设置对话框与工作台设置“常规”中的“桌面层贴纸可选取文字（关闭鼠标穿透）”，两处同步），默认关闭，保持原有点击穿透。
+- 开启后，全局操作关闭时：
+  - 桌面层贴纸不再忽略鼠标，可选取文字、点击链接；层级不变，仍在桌面层。
+  - 贴纸仍按非置顶语义处理：只读、不显示 hover 工具栏、不可拖动、不可双击编辑（`canInteract` 不变）；编辑与拖动仍需置顶或全局操作。
+  - 壁纸层贴纸继续点击穿透：Windows/macOS 下壁纸层在桌面图标之下，点击本就到不了贴纸。
+  - 代价：贴纸覆盖的区域不能再点到下方的桌面图标。
+- 实现：Rust `resolve_note_ignore_cursor`（`desktop/sticky/layer.rs`）与前端 `resolveNoteIgnoreCursor`（`src/lib/note/note-interaction-policy.js`）同一规则；贴纸页监听 `preferences_changed`，切换后立即生效。
+- 验证状态：Linux（Raspberry Pi OS / labwc）已实机验证；Windows（WorkerW 子窗口）与 macOS（桌面层 `ignoresMouseEvents`）未验证。2026-02-07 曾因 WorkerW 子窗口拖动卡顿而禁用置底交互，Windows 上需重点确认选取文字与 Ctrl+C 是否正常。
+
 ## Backend Changes
 文件：`src-tauri/src/lib.rs`
 
