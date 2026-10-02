@@ -269,10 +269,10 @@
 <a id="t-desktop-selectable"></a>
 
 ```tracking-task
-{"id":"T-DESKTOP-SELECTABLE","name":"桌面层贴纸可选取文字选项","goal":"用户可选择让桌面层贴纸接收鼠标以选取文字，而不必开启全局操作或置顶","scope":"偏好 desktopStickiesSelectable（默认关）、Rust 与前端统一穿透判定、设置面板开关；只影响桌面层，壁纸层仍穿透；不改变只读/拖动/编辑规则","acceptance":"默认行为不变；开启后三端桌面层贴纸可选取文字与复制，层级不变，覆盖区域不再穿透到桌面图标；切换即时生效；关闭后恢复穿透","dependencies":[],"version":"v1","mode":"lightweight","status":"in_progress","execution_ref":"ui/2026-02-07-overlay-interaction-topmost-policy.md","acceptance_evidence":["Linux（Raspberry Pi OS / labwc）实机验证；Windows、macOS 待实机验证"],"priority":"medium","unplanned_reason":"用户 2026-10-03 在 Linux 验收中提出"}
+{"id":"T-DESKTOP-SELECTABLE","name":"桌面层贴纸可选取文字选项","goal":"用户可选择让桌面层贴纸接收鼠标以选取文字，而不必开启全局操作或置顶","scope":"偏好 desktopStickiesSelectable（默认关）、Rust 与前端统一穿透判定、设置面板开关；只影响桌面层，壁纸层仍穿透；不改变只读/拖动/编辑规则","acceptance":"默认行为不变；开启后三端桌面层贴纸可选取文字与复制，层级不变，覆盖区域不再穿透到桌面图标；切换即时生效；关闭后恢复穿透","dependencies":[],"version":"v1","mode":"lightweight","status":"in_progress","execution_ref":"ui/2026-02-07-overlay-interaction-topmost-policy.md","acceptance_evidence":["Linux（Raspberry Pi OS / labwc）实机验证","macOS 26（Intel）2026-10-03 用户实机初步确认桌面层贴纸可选取文字","Windows 待实机验证"],"priority":"medium","unplanned_reason":"用户 2026-10-03 在 Linux 验收中提出"}
 ```
 
-规则与实现见[交互策略补充](ui/2026-02-07-overlay-interaction-topmost-policy.md)。待办：Windows 上确认 WorkerW 内贴纸能选取文字并用 Ctrl+C 复制；macOS 上确认桌面层贴纸可点击且不抢焦点。
+规则与实现见[交互策略补充](ui/2026-02-07-overlay-interaction-topmost-policy.md)。待办：Windows 上确认 WorkerW 内贴纸能选取文字并用 Ctrl+C 复制；macOS 上确认桌面层贴纸不抢焦点。2026-10-03：没有桌面层贴纸时，工作台侧栏的开关也变暗并在提示中说明原因，避免全是壁纸层贴纸时被误认为开关失效。
 
 ## Done
 

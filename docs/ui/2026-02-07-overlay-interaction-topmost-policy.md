@@ -73,13 +73,14 @@
 - 需求：用户有时希望直接在桌面层贴纸上选取文字，而不必开启全局操作或把贴纸置顶。
 - 新增偏好 `desktopStickiesSelectable`（简洁模式设置对话框与工作台设置“常规”中的“桌面层贴纸可选取文字（关闭鼠标穿透）”，两处同步），默认关闭，保持原有点击穿透。
 - 工作台侧栏底部快捷开关按优先级排列：启用桌面贴纸（总开关）→ 启用贴纸全局操作（开启时所有贴纸可操作）→ 贴纸可选取文字（只作用于留在桌面层的贴纸）。前两者关闭贴纸或开启全局操作时，第三个开关变暗表示被覆盖，但仍可切换。
+- 开关无作用时说明原因（2026-10-03）：macOS 实测时用户唯一一张钉住的贴纸在壁纸层，开关开着却选不了文字，看起来像失效。现在已钉住、未归档、未删除的贴纸（即有贴纸窗口的贴纸）里没有桌面层贴纸（全是壁纸层或置顶）时，第三个开关同样变暗；悬停提示在“开/关”之后附上原因（贴纸已隐藏 / 全局操作开启中 / 没有桌面层贴纸）。判定为 `resolveDesktopSelectableOverride`（`src/lib/note/note-interaction-policy.js`），“有贴纸窗口”与 `use-window-sync.js` 共用 `hasStickyWindow`。两处设置项也注明只影响桌面层贴纸（工作台设置显示为说明文字，简洁模式设置为悬停提示）。
 - 开启后，全局操作关闭时：
   - 桌面层贴纸不再忽略鼠标，可选取文字、点击链接；层级不变，仍在桌面层。
   - 贴纸仍按非置顶语义处理：只读、不显示 hover 工具栏、不可拖动、不可双击编辑（`canInteract` 不变）；编辑与拖动仍需置顶或全局操作。
   - 壁纸层贴纸继续点击穿透：Windows/macOS 下壁纸层在桌面图标之下，点击本就到不了贴纸。
   - 代价：贴纸覆盖的区域不能再点到下方的桌面图标。
 - 实现：Rust `resolve_note_ignore_cursor`（`desktop/sticky/layer.rs`）与前端 `resolveNoteIgnoreCursor`（`src/lib/note/note-interaction-policy.js`）同一规则；贴纸页监听 `preferences_changed`，切换后立即生效。
-- 验证状态：Linux（Raspberry Pi OS / labwc）已实机验证；Windows（WorkerW 子窗口）与 macOS（桌面层 `ignoresMouseEvents`）未验证。2026-02-07 曾因 WorkerW 子窗口拖动卡顿而禁用置底交互，Windows 上需重点确认选取文字与 Ctrl+C 是否正常。
+- 验证状态：Linux（Raspberry Pi OS / labwc）已实机验证；macOS 26（Intel）2026-10-03 用户实机初步确认桌面层贴纸可选取文字，是否抢焦点未确认；Windows（WorkerW 子窗口）未验证。macOS 壁纸层贴纸位于 `kCGDesktopWindowLevel`，Finder 的桌面图标窗口在其上一层（`kCGDesktopIconWindowLevel`）且覆盖整个屏幕，点击全被它接走，这是壁纸层必须穿透的原因。2026-02-07 曾因 WorkerW 子窗口拖动卡顿而禁用置底交互，Windows 上需重点确认选取文字与 Ctrl+C 是否正常。
 
 ## Backend Changes
 文件：`src-tauri/src/lib.rs`
