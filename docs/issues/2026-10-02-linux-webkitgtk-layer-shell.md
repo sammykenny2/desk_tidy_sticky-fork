@@ -65,7 +65,9 @@ tao 处理 `set_ignore_cursor_events(true)` 时对 `window.window()` 直接 `unw
 - `global-hotkey` 在 Linux 上通过 X11 抓键。Wayland 会话里 DISPLAY 指向 XWayland，注册能成功，但焦点在 Wayland 窗口时收不到按键。
 - 托盘项通过 libayatana-appindicator 注册（`RegisteredStatusNotifierItems` 可见），但 `IconName` 是 PNG 绝对路径。wf-panel-pi 的托盘只用图标主题查 `IconName`，不支持绝对路径，也不读取该项提供的 `IconThemePath`；libayatana 不提供 `IconPixmap`，因此不显示。同一面板上能显示的托盘项，一个用主题图标名（Fcitx：`input-keyboard-symbolic`），一个提供 `IconPixmap`（Electron 应用）。tray-icon 0.21 在 Linux 上只能用文件设置图标，无法改为主题图标名。
 
-处理：单实例回调支持命令行动作（`--toggle-panel`、`--toggle-global-operation`、`--hide-or-reveal-stickies`、`--quit`），可绑定到 labwc 的 `rc.xml` 快捷键；没有实例运行时 `--quit` 直接退出。用法见 `docs/build/2026-10-02-linux-deb.md`。
+处理（托盘，2026-10-03）：参照 cats-platform（Electron 在 Linux 上把托盘图标作为像素传出），Linux 下改用 ksni 自行发布 StatusNotifierItem，`IconPixmap` 为 ARGB32（`desktop/tray_linux.rs`），菜单项与 Tauri 托盘共用 `run_tray_action`，文字随前端语言更新；找不到 StatusNotifierWatcher 时退回 Tauri 托盘。实测 wf-panel-pi 显示图标，左键打开面板，右键菜单（含分隔线）各项可用，“退出”经 `EventGroup` 正常结束程序。
+
+处理（快捷键）：单实例回调支持命令行动作（`--toggle-panel`、`--toggle-global-operation`、`--hide-or-reveal-stickies`、`--quit`），可绑定到 labwc 的 `rc.xml` 快捷键；没有实例运行时 `--quit` 直接退出。用法见 `docs/build/2026-10-02-linux-deb.md`。
 
 ### 1.8 切换层级后点击穿透失效（2026-10-03）
 
@@ -96,7 +98,6 @@ tao 处理 `set_ignore_cursor_events(true)` 时对 `window.window()` 直接 `unw
 
 ## 5. 未解决
 
-- wf-panel-pi 不显示托盘图标（1.7）。
 - 贴纸无法用窗口边缘拖拽改变尺寸：tao 的无边框缩放依赖 xdg_toplevel，layer surface 没有。需要程序内缩放手柄。
 - 壁纸层无法位于 pcmanfm 图标之下（1.3）。
 - 磨砂没有原生模糊效果；贴纸透明度调节在 Linux 上的视觉效果未单独验证。
