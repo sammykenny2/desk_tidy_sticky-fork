@@ -25,7 +25,10 @@ pub use display_recovery::{schedule_hidden_note_recovery, StickyDisplayRecoveryS
 pub use effects::apply_note_window_frost;
 use effects::{apply_note_window_frost_by_label, sync_note_window_frost_by_id};
 pub use layer::apply_overlay_input_state;
-use layer::{apply_note_window_layer_with_interaction_by_label, get_overlay_interaction_disabled};
+use layer::{
+    apply_note_window_layer_with_interaction_by_label, get_overlay_interaction_disabled,
+    layer_debug,
+};
 pub use panel_window::{configure_note_panel_window, dismiss_note_window_by_label};
 
 fn parse_sort_mode(sort_mode: &str) -> NoteSortMode {
@@ -111,6 +114,12 @@ pub fn apply_note_window_layer(
     is_always_on_top: bool,
     is_wallpaper: bool,
 ) -> Result<(), String> {
+    layer_debug(|| {
+        format!(
+            "command apply_note_window_layer from {} top={is_always_on_top} wallpaper={is_wallpaper}",
+            window.label()
+        )
+    });
     apply_note_window_layer_with_interaction_by_label(
         &app,
         window.label(),

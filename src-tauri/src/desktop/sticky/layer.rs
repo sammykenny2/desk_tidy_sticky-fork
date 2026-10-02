@@ -8,6 +8,27 @@ use tauri::Manager;
 
 use super::effects::apply_note_window_frost_by_label;
 
+/// `DESK_TIDY_LAYER_DEBUG=1` prints every note-window layer and input-state transition to
+/// stderr. Layer bugs are invisible otherwise: the Win32 calls report success while the
+/// window ends up somewhere else, so the actual parent and styles are what get logged.
+pub(super) fn layer_debug(message: impl FnOnce() -> String) {
+    static ENABLED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let enabled = *ENABLED
+        .get_or_init(|| std::env::var_os("DESK_TIDY_LAYER_DEBUG").is_some_and(|v| v == "1"));
+    if enabled {
+        eprintln!("[layer-debug] {}", message());
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn describe_note_window(w: &tauri::WebviewWindow) -> String {
+    match window_hwnd_isize(w) {
+        Ok(Some(hwnd)) => windows::describe_window(hwnd),
+        Ok(None) => "hwnd unavailable".to_string(),
+        Err(error) => format!("hwnd error: {error}"),
+    }
+}
+
 pub fn apply_overlay_input_state(app: &tauri::AppHandle, interaction_disabled: bool) {
     let notes =
         notes_store::with_notes_store(app, || notes_service::load_notes(NoteSortMode::Custom))
@@ -18,6 +39,13 @@ pub fn apply_overlay_input_state(app: &tauri::AppHandle, interaction_disabled: b
                 );
                 Vec::new()
             });
+    layer_debug(|| {
+        let labels: Vec<String> = app.webview_windows().into_keys().collect();
+        format!(
+            "apply_overlay_input_state interaction_disabled={interaction_disabled} notes={} windows={labels:?}",
+            notes.len()
+        )
+    });
     for (label, w) in app.webview_windows() {
         if label.starts_with("note-") {
             let note_id = label.trim_start_matches("note-");
@@ -27,17 +55,30 @@ pub fn apply_overlay_input_state(app: &tauri::AppHandle, interaction_disabled: b
                     n.is_wallpaper,
                     interaction_disabled,
                 );
-                let _ = w.set_ignore_cursor_events(ignore_cursor);
-                let _ = apply_note_window_layer_with_interaction_by_label(
+                layer_debug(|| {
+                    format!(
+                        "  {label}: top={} wallpaper={} -> ignore_cursor={ignore_cursor}",
+                        n.is_always_on_top, n.is_wallpaper
+                    )
+                });
+                if let Err(error) = w.set_ignore_cursor_events(ignore_cursor) {
+                    eprintln!("[layer] {label}: set_ignore_cursor_events failed: {error}");
+                }
+                if let Err(error) = apply_note_window_layer_with_interaction_by_label(
                     app,
                     &label,
                     n.is_always_on_top,
                     interaction_disabled,
                     n.is_wallpaper,
-                );
+                ) {
+                    eprintln!("[layer] {label}: apply layer failed: {error}");
+                }
                 let _ = apply_note_window_frost_by_label(app, &label, n.frost.unwrap_or_default());
             } else {
-                let _ = w.set_ignore_cursor_events(interaction_disabled);
+                layer_debug(|| format!("  {label}: no matching note"));
+                if let Err(error) = w.set_ignore_cursor_events(interaction_disabled) {
+                    eprintln!("[layer] {label}: set_ignore_cursor_events failed: {error}");
+                }
             }
         }
     }
@@ -51,6 +92,7 @@ pub(super) fn apply_note_window_layer_with_interaction_by_label(
     is_wallpaper: bool,
 ) -> Result<(), String> {
     let Some(w) = app.get_webview_window(label) else {
+        layer_debug(|| format!("apply layer {label}: no webview window"));
         return Ok(());
     };
     let force_global_top = !interaction_disabled;
@@ -58,24 +100,30 @@ pub(super) fn apply_note_window_layer_with_interaction_by_label(
     #[cfg(target_os = "windows")]
     {
         let Some(hwnd_isize) = window_hwnd_isize(&w)? else {
+            layer_debug(|| format!("apply layer {label}: hwnd unavailable"));
             return Ok(());
         };
-        if force_global_top || is_always_on_top {
-            windows::detach_from_worker_w(hwnd_isize)?;
-            let _ = w.set_always_on_top(true);
-            windows::set_topmost_no_activate(hwnd_isize, true)?;
-            return Ok(());
-        }
-        if is_wallpaper {
-            let _ = w.set_always_on_top(false);
-            windows::set_topmost_no_activate(hwnd_isize, false)?;
-            windows::attach_to_wallpaper_worker_w(hwnd_isize)?;
-            return Ok(());
-        }
-        let _ = w.set_always_on_top(false);
-        windows::set_topmost_no_activate(hwnd_isize, false)?;
-        windows::attach_to_worker_w(hwnd_isize)?;
-        return Ok(());
+        let branch = if force_global_top || is_always_on_top {
+            "topmost"
+        } else if is_wallpaper {
+            "wallpaper"
+        } else {
+            "desktop"
+        };
+        layer_debug(|| {
+            format!(
+                "apply layer {label} branch={branch} (top={is_always_on_top} wallpaper={is_wallpaper} interaction_disabled={interaction_disabled}) before: {}",
+                describe_note_window(&w)
+            )
+        });
+        let result = apply_windows_layer(&w, hwnd_isize, branch);
+        layer_debug(|| {
+            format!(
+                "apply layer {label} branch={branch} result={result:?} after: {}",
+                describe_note_window(&w)
+            )
+        });
+        return result;
     }
 
     #[cfg(target_os = "macos")]
@@ -114,6 +162,32 @@ pub(super) fn apply_note_window_layer_with_interaction_by_label(
         let _ = w.set_always_on_top(force_global_top || is_always_on_top);
         Ok(())
     }
+}
+
+#[cfg(target_os = "windows")]
+fn apply_windows_layer(
+    w: &tauri::WebviewWindow,
+    hwnd_isize: isize,
+    branch: &str,
+) -> Result<(), String> {
+    match branch {
+        "topmost" => {
+            windows::detach_from_worker_w(hwnd_isize)?;
+            let _ = w.set_always_on_top(true);
+            windows::set_topmost_no_activate(hwnd_isize, true)?;
+        }
+        "wallpaper" => {
+            let _ = w.set_always_on_top(false);
+            windows::set_topmost_no_activate(hwnd_isize, false)?;
+            windows::attach_to_wallpaper_worker_w(hwnd_isize)?;
+        }
+        _ => {
+            let _ = w.set_always_on_top(false);
+            windows::set_topmost_no_activate(hwnd_isize, false)?;
+            windows::attach_to_worker_w(hwnd_isize)?;
+        }
+    }
+    Ok(())
 }
 
 fn resolve_note_ignore_cursor(

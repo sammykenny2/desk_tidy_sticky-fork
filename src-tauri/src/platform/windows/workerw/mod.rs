@@ -2,10 +2,10 @@ use std::ffi::c_void;
 use windows::Win32::Foundation::{GetLastError, SetLastError, HWND, WIN32_ERROR};
 use windows::Win32::Graphics::Gdi::{SetWindowRgn, HRGN};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetDesktopWindow, GetParent, GetWindowLongPtrW, IsWindow, SetParent, SetWindowLongPtrW,
-    SetWindowPos, GWL_STYLE, HWND_BOTTOM, HWND_NOTOPMOST, HWND_TOP, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_CHILD, WS_MAXIMIZEBOX, WS_POPUP,
-    WS_THICKFRAME,
+    GetAncestor, GetDesktopWindow, GetWindowLongPtrW, IsWindow, SetParent,
+    SetWindowLongPtrW, SetWindowPos, GA_PARENT, GWL_EXSTYLE, GWL_STYLE, HWND_BOTTOM,
+    HWND_NOTOPMOST, HWND_TOP, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_NOZORDER, WS_CHILD, WS_MAXIMIZEBOX, WS_POPUP, WS_THICKFRAME,
 };
 
 mod discovery;
@@ -21,21 +21,25 @@ fn parent_matches(parent: HWND, expected_parent: HWND, desktop: HWND) -> bool {
     parent == expected_parent || (expected_parent == desktop && parent.0.is_null())
 }
 
+/// The window's real parent; NULL for a top-level window.
+///
+/// GetParent is not usable here: it reports a parent only for WS_CHILD windows. tao rewrites
+/// the whole window style from its own flags on every set_always_on_top /
+/// set_ignore_cursor_events call and drops the WS_CHILD that attach added, so an embedded
+/// note then reads as top-level while it is still inside WorkerW, and detach skips
+/// SetParent(NULL) (seen on Windows 11 build 26200). GetAncestor(GA_PARENT) returns the
+/// actual parent regardless of style, and the desktop window for a top-level window.
 unsafe fn read_parent(hwnd: HWND) -> Result<HWND, u32> {
     SetLastError(WIN32_ERROR(0));
-    match GetParent(hwnd) {
-        Ok(parent) => Ok(parent),
-        Err(_) => {
-            let code = GetLastError().0;
-            // windows-rs maps a NULL HWND to Err even though Win32 uses NULL + error 0
-            // for a valid top-level window with no parent.
-            if code == 0 {
-                Ok(null_hwnd())
-            } else {
-                Err(code)
-            }
-        }
+    let parent = GetAncestor(hwnd, GA_PARENT);
+    if parent.0.is_null() {
+        let code = GetLastError().0;
+        return if code == 0 { Ok(null_hwnd()) } else { Err(code) };
     }
+    if parent == GetDesktopWindow() {
+        return Ok(null_hwnd());
+    }
+    Ok(parent)
 }
 
 fn set_parent_checked(hwnd: HWND, expected_parent: HWND, phase: &str) -> Result<bool, String> {
@@ -92,6 +96,24 @@ fn refresh_style(hwnd: HWND) {
     unsafe {
         let flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED;
         let _ = SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags);
+    }
+}
+
+/// Parent and window styles of `hwnd`, for `DESK_TIDY_LAYER_DEBUG` diagnostics.
+pub fn describe_window(hwnd_isize: isize) -> String {
+    let hwnd = HWND(hwnd_isize as *mut c_void);
+    unsafe {
+        let parent = match read_parent(hwnd) {
+            Ok(parent) if parent.0.is_null() => "top-level".to_string(),
+            Ok(parent) => format!("{:#x}", parent.0 as usize),
+            Err(code) => format!("error {code}"),
+        };
+        let style = GetWindowLongPtrW(hwnd, GWL_STYLE) as u32;
+        let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
+        format!(
+            "hwnd={:#x} parent={parent} style={style:#010x} ex_style={ex_style:#010x}",
+            hwnd_isize as usize
+        )
     }
 }
 

@@ -1,8 +1,8 @@
 use std::ffi::c_void;
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetDesktopWindow, GetParent, GetWindowLongPtrW, IsWindow, SetWindowLongPtrW, SetWindowPos,
-    GWL_STYLE, HWND_BOTTOM, HWND_NOTOPMOST, HWND_TOP, HWND_TOPMOST, SWP_FRAMECHANGED,
+    GetAncestor, GetDesktopWindow, GetWindowLongPtrW, IsWindow, SetWindowLongPtrW, SetWindowPos,
+    GA_PARENT, GWL_STYLE, HWND_BOTTOM, HWND_NOTOPMOST, HWND_TOP, HWND_TOPMOST, SWP_FRAMECHANGED,
     SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW, WS_MAXIMIZEBOX,
     WS_THICKFRAME,
 };
@@ -46,8 +46,10 @@ pub fn send_window_to_bottom_if_top_level(hwnd_isize: isize) -> Result<(), Strin
         if hwnd.0.is_null() || !IsWindow(hwnd).as_bool() {
             return Err("send_window_to_bottom target hwnd invalid".to_string());
         }
+        // GetAncestor, not GetParent: once tao rewrites the style and drops WS_CHILD, GetParent
+        // reports NULL for a note still embedded in WorkerW (see workerw::read_parent).
         let desktop = GetDesktopWindow();
-        let parent = GetParent(hwnd).unwrap_or(HWND(std::ptr::null_mut()));
+        let parent = GetAncestor(hwnd, GA_PARENT);
         if parent != desktop && !parent.0.is_null() {
             return Ok(());
         }
