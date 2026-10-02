@@ -31,6 +31,16 @@ use crate::desktop::layer_debug;
 
 const NAMESPACE: &str = "desk-tidy-sticky";
 
+/// After a note surface is moved, resized or put on another layer, WebKit repaints only
+/// the regions it considers damaged (the text block), and the rest of the note keeps a
+/// stale shade until the window is recreated. Flipping the root opacity damages the
+/// whole page, so the next frame is a full repaint.
+const REPAINT_SCRIPT: &str = "(() => { const s = document.documentElement.style; \
+    s.opacity = '0.999'; \
+    requestAnimationFrame(() => requestAnimationFrame(() => { s.opacity = ''; })); })()";
+/// A drag reconfigures the surface on every pointer move; repaint once it settles.
+const REPAINT_DELAY: std::time::Duration = std::time::Duration::from_millis(120);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum NoteLayer {
     Wallpaper,
@@ -57,27 +67,49 @@ pub(crate) struct SurfaceGeometry {
     pub height: f64,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct SurfaceEntry {
+    geometry: SurfaceGeometry,
+    /// Bumped on every reconfigure, so only the last one in a burst repaints.
+    repaint_generation: u64,
+}
+
 /// Geometry of every note window that is a layer surface, keyed by window label.
 #[derive(Default)]
-pub struct LinuxNoteSurfaceState(Mutex<HashMap<String, SurfaceGeometry>>);
+pub struct LinuxNoteSurfaceState(Mutex<HashMap<String, SurfaceEntry>>);
 
 impl LinuxNoteSurfaceState {
     fn get(&self, label: &str) -> Option<SurfaceGeometry> {
-        self.0.lock().ok()?.get(label).copied()
+        Some(self.0.lock().ok()?.get(label)?.geometry)
     }
 
     fn update(&self, label: &str, apply: impl FnOnce(&mut SurfaceGeometry)) {
         if let Ok(mut guard) = self.0.lock() {
-            if let Some(geometry) = guard.get_mut(label) {
-                apply(geometry);
+            if let Some(entry) = guard.get_mut(label) {
+                apply(&mut entry.geometry);
             }
         }
     }
 
     fn insert(&self, label: &str, geometry: SurfaceGeometry) {
         if let Ok(mut guard) = self.0.lock() {
-            guard.insert(label.to_string(), geometry);
+            let entry = SurfaceEntry {
+                geometry,
+                repaint_generation: 0,
+            };
+            guard.insert(label.to_string(), entry);
         }
+    }
+
+    fn next_repaint_generation(&self, label: &str) -> Option<u64> {
+        let mut guard = self.0.lock().ok()?;
+        let entry = guard.get_mut(label)?;
+        entry.repaint_generation += 1;
+        Some(entry.repaint_generation)
+    }
+
+    fn repaint_generation(&self, label: &str) -> Option<u64> {
+        Some(self.0.lock().ok()?.get(label)?.repaint_generation)
     }
 
     pub fn forget(&self, label: &str) {
@@ -219,6 +251,26 @@ pub(crate) fn init_note_surface(
     Ok(true)
 }
 
+fn schedule_repaint(window: &tauri::WebviewWindow) {
+    let Some(generation) =
+        surface_state(window).and_then(|state| state.next_repaint_generation(window.label()))
+    else {
+        return;
+    };
+    let target = window.clone();
+    let _ = with_gtk_window(window, "schedule_repaint", move |_| {
+        gtk::glib::timeout_add_local_once(REPAINT_DELAY, move || {
+            let current =
+                surface_state(&target).and_then(|state| state.repaint_generation(target.label()));
+            if current == Some(generation) {
+                if let Err(error) = target.eval(REPAINT_SCRIPT) {
+                    eprintln!("[linux] {}: repaint failed: {error}", target.label());
+                }
+            }
+        });
+    });
+}
+
 pub(crate) fn set_note_surface_layer(
     window: &tauri::WebviewWindow,
     layer: NoteLayer,
@@ -227,7 +279,9 @@ pub(crate) fn set_note_surface_layer(
         if gtk_window.is_layer_window() {
             gtk_window.set_layer(layer.gtk_layer());
         }
-    })
+    })?;
+    schedule_repaint(window);
+    Ok(())
 }
 
 pub(crate) fn move_note_surface(
@@ -246,7 +300,9 @@ pub(crate) fn move_note_surface(
         if gtk_window.is_layer_window() {
             place(gtk_window, x, y);
         }
-    })
+    })?;
+    schedule_repaint(window);
+    Ok(())
 }
 
 pub(crate) fn resize_note_surface(
@@ -266,5 +322,7 @@ pub(crate) fn resize_note_surface(
         if gtk_window.is_layer_window() {
             gtk_window.set_size_request(width as i32, height as i32);
         }
-    })
+    })?;
+    schedule_repaint(window);
+    Ok(())
 }
