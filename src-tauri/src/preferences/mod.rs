@@ -4,6 +4,6 @@ pub(crate) mod model;
 
 pub(crate) use commands::{get_preferences, set_preferences};
 pub(crate) use model::{
-    read_last_panel_window, read_preferences, read_show_panel_on_startup, patch_preferences,
-    PanelPreferences,
+    read_desktop_stickies_selectable, read_last_panel_window, read_preferences,
+    read_show_panel_on_startup, patch_preferences, PanelPreferences,
 };

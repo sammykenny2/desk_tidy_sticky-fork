@@ -71,7 +71,9 @@ pub fn ensure_workspace_panel_window(app: &tauri::AppHandle) -> Option<tauri::We
     .title("Desk Tidy Workspace")
     .inner_size(1024.0, 720.0)
     .center()
-    .transparent(true)
+    // A transparent WebKitGTK window repaints only damaged regions on Linux and leaves
+    // the rest blank; `tauri.linux.conf.json` makes the main panel opaque for this too.
+    .transparent(!cfg!(target_os = "linux"))
     .visible(false)
     .decorations(false)
     .skip_taskbar(false)

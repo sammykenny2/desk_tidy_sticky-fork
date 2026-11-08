@@ -62,6 +62,7 @@
   let showSettings = $state(false);
   let proMode = $state(false);
   let showStickyToggleOnHome = $state(true);
+  let desktopStickiesSelectable = $state(false);
   let isAutostartEnabled = $state(false);
   let autostartAvailable = $state(false);
   let showPanelOnStartup = $state(false);
@@ -230,6 +231,7 @@
       stickiesVisible = p.overlayEnabled ?? true;
       proMode = p.proMode ?? false;
       showStickyToggleOnHome = p.showStickyToggleOnHome ?? true;
+      desktopStickiesSelectable = p.desktopStickiesSelectable ?? false;
     } catch (e) {
       console.error("loadPrefs", e);
     }
@@ -499,6 +501,9 @@
         if (typeof updates.showPanelOnStartup === "boolean") {
           showPanelOnStartup = updates.showPanelOnStartup;
         }
+        if (typeof updates.desktopStickiesSelectable === "boolean") {
+          desktopStickiesSelectable = updates.desktopStickiesSelectable;
+        }
         if (typeof updates.autostartEnabled === "boolean") {
           isAutostartEnabled = updates.autostartEnabled;
         }
@@ -623,6 +628,7 @@
   onHideAfterSaveChange={() => savePrefs({ hideAfterSave })}
   bind:proMode
   bind:showStickyToggleOnHome
+  bind:desktopStickiesSelectable
 />
 
 <style>

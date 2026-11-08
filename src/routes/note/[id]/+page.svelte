@@ -22,6 +22,9 @@
     resolveNoteId,
   } from "$lib/note/note-window-actions.js";
   import { createNoteWindowDragController } from "$lib/note/note-window-drag.js";
+  import { resolveNoteIgnoreCursor } from "$lib/note/note-interaction-policy.js";
+  import { listenPreferencesChanged } from "$lib/preferences/preferences-sync.js";
+  import { isLinuxDesktop } from "$lib/runtime/platform.js";
   import { createStickyEdgeRevealController } from "$lib/note/sticky-edge-reveal.js";
   import {
     getCollapsedNoteWindowFrame,
@@ -52,6 +55,7 @@
   const noteId = $derived(String($page.params.id || ""));
   let text = $state("");
   let globalControlDisabled = $state(false);
+  let desktopStickiesSelectable = $state(false);
   /** @type {string} */
   let locale = $state(resolveAppLocale());
   let showPalette = $state(false);
@@ -106,9 +110,12 @@
   const isWindows =
     typeof navigator !== "undefined" &&
     /win/i.test(String(navigator.userAgent || navigator.platform || ""));
+  const linuxDesktop = isLinuxDesktop();
   const noteSurfaceAlpha = $derived(resolveNoteSurfaceAlpha(noteOpacity, noteFrost));
   const noteBackground = $derived(hexToRgba(noteBgColor, noteSurfaceAlpha));
-  const noteWindowRadius = $derived(isWindows ? "0px" : "12px");
+  // On Windows the native window region clips the note to the same radius
+  // (NOTE_CORNER_RADIUS in src-tauri/src/desktop/sticky/corners.rs).
+  const noteWindowRadius = "12px";
   const canInteract = $derived(!globalControlDisabled || !!note?.isAlwaysOnTop);
   const isEffectiveTopmost = $derived(!!note?.isAlwaysOnTop || !globalControlDisabled);
   const isPinnedTopmostSticky = $derived(!!note?.isPinned && !!note?.isAlwaysOnTop);
@@ -244,7 +251,14 @@
     return true;
   }
 
+  /** @returns {Promise<{ x: number; y: number; surfaceRelativePointer?: boolean }>} */
+  function getNoteWindowPosition() {
+    return invoke("get_note_window_position");
+  }
+
   async function getLogicalOuterPosition() {
+    // A layer-shell note on Linux has no position the window API can report.
+    if (linuxDesktop) return getNoteWindowPosition();
     const currentWindow = getCurrentWindow();
     const [position, scaleFactor] = await Promise.all([
       currentWindow.outerPosition(),
@@ -266,7 +280,9 @@
     const logicalHeight = Math.max(NOTE_MIN_SIZE_PX, Math.round(nextHeight));
     try {
       const operations = [
-        getCurrentWindow().setSize(new LogicalSize(logicalWidth, logicalHeight)),
+        linuxDesktop
+          ? invoke("set_note_window_size", { width: logicalWidth, height: logicalHeight })
+          : getCurrentWindow().setSize(new LogicalSize(logicalWidth, logicalHeight)),
       ];
       if (nextOuterPosition) {
         operations.push(
@@ -432,17 +448,20 @@
   async function getPersistableWindowSize() {
     let rawWidth = Math.max(NOTE_MIN_SIZE_PX, Math.round(window.innerWidth || NOTE_MIN_SIZE_PX));
     let rawHeight = Math.max(NOTE_MIN_SIZE_PX, Math.round(window.innerHeight || NOTE_MIN_SIZE_PX));
-    try {
-      const currentWindow = getCurrentWindow();
-      const [physicalSize, scaleFactor] = await Promise.all([
-        currentWindow.innerSize(),
-        currentWindow.scaleFactor(),
-      ]);
-      const logicalSize = physicalSize.toLogical(scaleFactor);
-      rawWidth = Math.max(NOTE_MIN_SIZE_PX, Math.round(logicalSize.width || rawWidth));
-      rawHeight = Math.max(NOTE_MIN_SIZE_PX, Math.round(logicalSize.height || rawHeight));
-    } catch (e) {
-      console.error("getPersistableWindowSize", e);
+    // On Linux the viewport is the measurement: a layer-shell note's native size is stale.
+    if (!linuxDesktop) {
+      try {
+        const currentWindow = getCurrentWindow();
+        const [physicalSize, scaleFactor] = await Promise.all([
+          currentWindow.innerSize(),
+          currentWindow.scaleFactor(),
+        ]);
+        const logicalSize = physicalSize.toLogical(scaleFactor);
+        rawWidth = Math.max(NOTE_MIN_SIZE_PX, Math.round(logicalSize.width || rawWidth));
+        rawHeight = Math.max(NOTE_MIN_SIZE_PX, Math.round(logicalSize.height || rawHeight));
+      } catch (e) {
+        console.error("getPersistableWindowSize", e);
+      }
     }
     const reserve = getAppliedControlsReserve();
     const width = Math.max(NOTE_MIN_SIZE_PX, rawWidth - reserve.horizontal);
@@ -549,12 +568,13 @@
     }
   }
 
-  async function loadLocale() {
+  async function loadPreferences() {
     try {
       const prefs = await invoke("get_preferences");
       locale = resolveAppLocale(prefs?.language);
+      desktopStickiesSelectable = prefs?.desktopStickiesSelectable ?? false;
     } catch (e) {
-      console.error("loadLocale", e);
+      console.error("loadPreferences", e);
     }
   }
 
@@ -623,9 +643,19 @@
   }
 
   async function applyInteractionPolicy() {
-    const ignoreCursor = !globalControlDisabled ? false : !(note?.isAlwaysOnTop);
+    const ignoreCursor = resolveNoteIgnoreCursor({
+      globalControlDisabled,
+      isAlwaysOnTop: !!note?.isAlwaysOnTop,
+      isWallpaper: !!note?.isWallpaper,
+      desktopStickiesSelectable,
+    });
     try {
-      await getCurrentWindow().setIgnoreCursorEvents(ignoreCursor);
+      // On Linux the regular call is undone when the note's layer surface is reconfigured.
+      if (linuxDesktop) {
+        await invoke("set_note_window_ignore_cursor", { ignore: ignoreCursor });
+      } else {
+        await getCurrentWindow().setIgnoreCursorEvents(ignoreCursor);
+      }
     } catch (e) {
       console.error("applyInteractionPolicy", e);
     }
@@ -1035,6 +1065,7 @@
 
   const noteWindowDrag = createNoteWindowDragController({
     getCurrentWindow,
+    getWindowPosition: linuxDesktop ? getNoteWindowPosition : undefined,
     moveWindow: (position) =>
       invoke("move_note_window_without_activation", {
         x: position.x,
@@ -1345,8 +1376,16 @@
       }),
     );
 
+    unlistenPromises.push(
+      listenPreferencesChanged(async (updates) => {
+        if (typeof updates.desktopStickiesSelectable !== "boolean") return;
+        desktopStickiesSelectable = updates.desktopStickiesSelectable;
+        await applyInteractionPolicy();
+      }),
+    );
+
     void refreshNotesStorageRecoveryState();
-    loadLocale()
+    loadPreferences()
       .then(loadGlobalControlState)
       .then(() => loadNote())
       .then(async () => {
@@ -1643,7 +1682,6 @@
   }
 
   .note-window.windows-flat {
-    --note-radius: 0px;
     background: var(--note-tint, transparent);
     filter: none;
   }

@@ -27,6 +27,10 @@ import {
   clampNoteOpacity,
 } from "../../src/lib/note/note-style-actions.js";
 import { resolveNoteSurfaceAlpha } from "../../src/lib/note/note-theme.js";
+import {
+  resolveDesktopSelectableOverride,
+  resolveNoteIgnoreCursor,
+} from "../../src/lib/note/note-interaction-policy.js";
 import { applyStructuralTextChange } from "../../src/lib/note/block-structural-commit.js";
 
 function createStructuralCommitHarness(saveResult) {
@@ -329,4 +333,201 @@ test("note surface drag moves the native window and persists its final position"
 
   assert.deepEqual(moves, [{ x: 110, y: 215 }]);
   assert.deepEqual(persisted, [{ x: 110, y: 215 }]);
+});
+
+test("surface-relative pointer drag keeps the grab point under the pointer", async () => {
+  // Wayland layer-shell notes report pointer "screen" coordinates relative to the
+  // window, which moves under the pointer, so each event is an offset from the grab point.
+  const moves = [];
+  const persisted = [];
+  let clock = 0;
+  /** @type {(() => void) | null} */
+  let finishMove = null;
+  const surface = {
+    setPointerCapture() {},
+    hasPointerCapture() {
+      return true;
+    },
+    releasePointerCapture() {},
+  };
+  const controller = createNoteWindowDragController({
+    getCurrentWindow: () => {
+      throw new Error("surface-relative drags read the position from getWindowPosition");
+    },
+    getWindowPosition: async () => ({ x: 100, y: 200, surfaceRelativePointer: true }),
+    moveWindow: (position) => {
+      moves.push(position);
+      return new Promise((resolve) => {
+        finishMove = () => resolve(undefined);
+      });
+    },
+    now: () => clock,
+    getCanInteract: () => true,
+    getIsEditing: () => false,
+    getIsAlwaysOnTop: () => true,
+    dismissFloatingPanels() {},
+    onPositionPersist: (position) => {
+      persisted.push(position);
+    },
+  });
+  const target = {
+    closest: (selector) => (selector === ".note-shell" ? surface : null),
+  };
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+  /** @param {number} screenX @param {number} screenY */
+  const move = async (screenX, screenY) => {
+    controller.onDragPointerMove({ pointerId: 3, buttons: 1, screenX, screenY, preventDefault() {} });
+    await flush();
+  };
+
+  controller.handleDragPointerDown({
+    button: 0,
+    pointerId: 3,
+    screenX: 10,
+    screenY: 10,
+    target,
+    currentTarget: surface,
+  });
+  await move(16, 16);
+  // The window has not moved yet: the pointer is 16, 21 away from the grab point.
+  await move(26, 31);
+  // Sent before the compositor applied that move, so relative to the old position.
+  await move(30, 35);
+  finishMove?.();
+  await flush();
+  clock += 10;
+  await move(31, 36);
+  // Settled: the window followed, and the pointer is 3, 2 past the grab point.
+  clock += 40;
+  await move(13, 12);
+  finishMove?.();
+  await flush();
+  // Dropped while that move settles; the release catches up with it.
+  await move(15, 13);
+  controller.onDragPointerUp({ pointerId: 3, screenX: 15, screenY: 13, currentTarget: surface });
+  await flush();
+
+  assert.deepEqual(moves, [
+    { x: 116, y: 221 },
+    { x: 119, y: 223 },
+    { x: 124, y: 226 },
+  ]);
+  assert.deepEqual(persisted, [{ x: 124, y: 226 }]);
+});
+
+test("a surface-relative release does not reapply the last applied pointer position", async () => {
+  const moves = [];
+  const persisted = [];
+  const surface = {
+    setPointerCapture() {},
+    hasPointerCapture() {
+      return true;
+    },
+    releasePointerCapture() {},
+  };
+  const controller = createNoteWindowDragController({
+    getCurrentWindow: () => {
+      throw new Error("unused");
+    },
+    getWindowPosition: async () => ({ x: 100, y: 200, surfaceRelativePointer: true }),
+    moveWindow: async (position) => {
+      moves.push(position);
+    },
+    now: () => 0,
+    getCanInteract: () => true,
+    getIsEditing: () => false,
+    getIsAlwaysOnTop: () => true,
+    dismissFloatingPanels() {},
+    onPositionPersist: (position) => {
+      persisted.push(position);
+    },
+  });
+  const target = {
+    closest: (selector) => (selector === ".note-shell" ? surface : null),
+  };
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  controller.handleDragPointerDown({
+    button: 0,
+    pointerId: 4,
+    screenX: 10,
+    screenY: 10,
+    target,
+    currentTarget: surface,
+  });
+  controller.onDragPointerMove({ pointerId: 4, buttons: 1, screenX: 16, screenY: 16, preventDefault() {} });
+  await flush();
+  controller.onDragPointerMove({ pointerId: 4, buttons: 1, screenX: 46, screenY: 10, preventDefault() {} });
+  await flush();
+  // Wayland button events carry no position: the release repeats the applied one.
+  controller.onDragPointerUp({ pointerId: 4, screenX: 46, screenY: 10, currentTarget: surface });
+  await flush();
+
+  assert.deepEqual(moves, [{ x: 136, y: 200 }]);
+  assert.deepEqual(persisted, [{ x: 136, y: 200 }]);
+});
+
+test("desktop stickies let clicks through unless selectable text is enabled", () => {
+  const desktop = { globalControlDisabled: true, isAlwaysOnTop: false, isWallpaper: false };
+  assert.equal(resolveNoteIgnoreCursor({ ...desktop, desktopStickiesSelectable: false }), true);
+  assert.equal(resolveNoteIgnoreCursor({ ...desktop, desktopStickiesSelectable: true }), false);
+});
+
+test("wallpaper stickies always let clicks through", () => {
+  const wallpaper = { globalControlDisabled: true, isAlwaysOnTop: false, isWallpaper: true };
+  assert.equal(resolveNoteIgnoreCursor({ ...wallpaper, desktopStickiesSelectable: false }), true);
+  assert.equal(resolveNoteIgnoreCursor({ ...wallpaper, desktopStickiesSelectable: true }), true);
+});
+
+test("topmost stickies and global operation take the cursor", () => {
+  const base = { isWallpaper: false, desktopStickiesSelectable: false };
+  assert.equal(
+    resolveNoteIgnoreCursor({ ...base, globalControlDisabled: true, isAlwaysOnTop: true }),
+    false,
+  );
+  assert.equal(
+    resolveNoteIgnoreCursor({ ...base, globalControlDisabled: false, isAlwaysOnTop: false }),
+    false,
+  );
+});
+
+test("the selectable-text switch applies while a pinned sticky is on the desktop layer", () => {
+  const notes = [
+    { isPinned: true, isWallpaper: true },
+    { isPinned: true, isAlwaysOnTop: false, isWallpaper: false },
+  ];
+  assert.equal(
+    resolveDesktopSelectableOverride({ stickiesVisible: true, globalControlDisabled: true, notes }),
+    null,
+  );
+});
+
+test("the selectable-text switch has no effect without a desktop-layer sticky", () => {
+  const visible = { stickiesVisible: true, globalControlDisabled: true };
+  assert.equal(resolveDesktopSelectableOverride({ ...visible, notes: [] }), "noDesktopStickies");
+  assert.equal(
+    resolveDesktopSelectableOverride({
+      ...visible,
+      notes: [
+        { isPinned: true, isWallpaper: true },
+        { isPinned: true, isAlwaysOnTop: true },
+        { isPinned: false },
+        { isPinned: true, isArchived: true },
+        { isPinned: true, isDeleted: true },
+      ],
+    }),
+    "noDesktopStickies",
+  );
+});
+
+test("hidden stickies and global operation override the selectable-text switch", () => {
+  const notes = [{ isPinned: true }];
+  assert.equal(
+    resolveDesktopSelectableOverride({ stickiesVisible: false, globalControlDisabled: false, notes }),
+    "stickiesHidden",
+  );
+  assert.equal(
+    resolveDesktopSelectableOverride({ stickiesVisible: true, globalControlDisabled: false, notes }),
+    "globalOperation",
+  );
 });

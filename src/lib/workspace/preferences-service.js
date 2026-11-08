@@ -35,7 +35,7 @@ const DEFAULT_WORKSPACE_FONT_SIZE = "medium";
 const DEFAULT_WORKSPACE_SIDEBAR_LAYOUT_MODE = "auto";
 const DEFAULT_WORKSPACE_SIDEBAR_MANUAL_SPLIT_RATIO = DEFAULT_SIDEBAR_MANUAL_SPLIT_RATIO;
 const DEFAULT_POMODORO = {
-  breakReminderEnabled: true,
+  breakReminderEnabled: false,
   focusMinutes: 25,
   shortBreakMinutes: 5,
   longBreakMinutes: 15,
@@ -109,7 +109,7 @@ export function normalizePomodoroConfig(input) {
     return Math.max(min, Math.min(max, Math.round(n)));
   };
   return {
-    breakReminderEnabled: raw.breakReminderEnabled !== false,
+    breakReminderEnabled: raw.breakReminderEnabled === true,
     focusMinutes: clamp(raw.focusMinutes, DEFAULT_POMODORO.focusMinutes, 5, 90),
     shortBreakMinutes: clamp(raw.shortBreakMinutes, DEFAULT_POMODORO.shortBreakMinutes, 1, 30),
     longBreakMinutes: clamp(raw.longBreakMinutes, DEFAULT_POMODORO.longBreakMinutes, 5, 60),
@@ -251,6 +251,7 @@ export async function loadWorkspacePreferences(invoke) {
     locale: resolveAppLocale(prefs.language || DEFAULT_LOCALE),
     overlayEnabled: prefs.overlayEnabled ?? true,
     showPanelOnStartup: prefs.showPanelOnStartup ?? false,
+    desktopStickiesSelectable: prefs.desktopStickiesSelectable ?? false,
     workspaceZoom: normalizeWorkspaceZoom(prefs.workspaceZoom),
     workspaceZoomMode: normalizeWorkspaceZoomMode(prefs.workspaceZoomMode),
     workspaceFontSize: normalizeWorkspaceFontSize(prefs.workspaceFontSize),

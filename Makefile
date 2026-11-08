@@ -1,4 +1,4 @@
-TASKS := help install dev start frontend-dev check check-frontend check-rust test test-frontend test-rust build build-frontend package package-portable package-portable-stop clean
+TASKS := help install dev start frontend-dev check check-frontend check-rust test test-frontend test-rust build build-frontend package package-deb package-deb-smoke package-portable package-portable-stop clean
 
 ifeq ($(OS),Windows_NT)
 RUN_TASK = powershell -NoProfile -ExecutionPolicy Bypass -File scripts/make/task.ps1
@@ -50,6 +50,12 @@ build-frontend:
 
 package:
 	$(RUN_TASK) package
+
+package-deb:
+	$(RUN_TASK) package-deb
+
+package-deb-smoke:
+	$(RUN_TASK) package-deb-smoke
 
 package-portable:
 	$(RUN_TASK) package-portable

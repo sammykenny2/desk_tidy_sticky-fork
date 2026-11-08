@@ -27,6 +27,7 @@ This is the first-read route for people and agents. Read the active documents be
 - [Current Agent Context](agent-context/current.md): current delivery line, risks, validation commands, and accepted gaps.
 - [Notes Storage Safety](architecture/2026-07-15-notes-storage-safety-and-governance.md): storage recovery and component-boundary design.
 - [Make Commands](build/make-commands.md): portable local verification and build entry points.
+- [Linux .deb](build/2026-10-02-linux-deb.md): Raspberry Pi OS build, install, command-line actions and known gaps; root causes in [issues/2026-10-02-linux-webkitgtk-layer-shell.md](issues/2026-10-02-linux-webkitgtk-layer-shell.md).
 
 ## Product And Operations
 

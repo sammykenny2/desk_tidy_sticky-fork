@@ -293,6 +293,17 @@ const strings = {
       'Markdown import preview:\\n- scanned: {scanned}\\n- new files: {import}\\n- files to update: {update}\\n- attachments to restore: {attachments}\\n- files without note_id: {withoutId}\\n\\nContinue import?',
     proMode: 'Hide Hints',
     showStickyToggleOnHome: 'Pin stickers control to header',
+    desktopStickiesSelectable: 'Select text on desktop stickers (no click-through)',
+    desktopStickiesSelectableShort: 'Selectable sticker text',
+    desktopStickiesSelectableStateOn: 'Desktop sticker text selection: ON',
+    desktopStickiesSelectableStateOff: 'Desktop sticker text selection: OFF',
+    desktopStickiesSelectableHint:
+      'Only affects stickers on the desktop layer. Wallpaper-layer stickers sit under the desktop icons and always let clicks through.',
+    desktopStickiesSelectableNoDesktopStickies:
+      'No effect now: no pinned sticker is on the desktop layer. Wallpaper-layer stickers sit under the icons and cannot be selected; topmost stickers are already interactive.',
+    desktopStickiesSelectableGlobalOperation:
+      'No effect now: global control is on, so every sticker is interactive.',
+    desktopStickiesSelectableStickiesHidden: 'No effect now: desktop stickers are hidden.',
     shortcuts: 'Shortcuts',
     shortcutToggle: 'Toggle Panel: Ctrl+Shift+N',
     shortcutOverlay: 'Toggle global control: Ctrl+Shift+O',
@@ -759,6 +770,15 @@ const strings = {
       'Markdown 导入预检：\\n- 扫描文件：{scanned}\\n- 新增导入：{import}\\n- 覆盖更新：{update}\\n- 恢复附件：{attachments}\\n- 缺少 note_id：{withoutId}\\n\\n确认继续导入吗？',
     proMode: '隐藏提示',
     showStickyToggleOnHome: '贴纸显示控制常驻简洁模式主页',
+    desktopStickiesSelectable: '桌面层贴纸可选取文字（关闭鼠标穿透）',
+    desktopStickiesSelectableShort: '贴纸可选取文字',
+    desktopStickiesSelectableStateOn: '桌面层贴纸选取文字：开',
+    desktopStickiesSelectableStateOff: '桌面层贴纸选取文字：关',
+    desktopStickiesSelectableHint: '只影响桌面层贴纸；壁纸层贴纸位于桌面图标下方，点击始终会穿透。',
+    desktopStickiesSelectableNoDesktopStickies:
+      '暂不生效：目前没有桌面层贴纸。壁纸层贴纸位于图标下方，无法选取文字；置顶贴纸本来就可操作。',
+    desktopStickiesSelectableGlobalOperation: '暂不生效：贴纸全局操作已开启，所有贴纸都可操作。',
+    desktopStickiesSelectableStickiesHidden: '暂不生效：桌面贴纸已隐藏。',
     shortcuts: '快捷键',
     shortcutToggle: '切换主窗口: Ctrl+Shift+N',
     shortcutOverlay: '切换贴纸全局操作: Ctrl+Shift+O',

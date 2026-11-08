@@ -3,3 +3,7 @@ plugins/**/*.dtplugin -text
 plugins/**/entry.js text eol=lf
 plugins/**/schema-v2.js text eol=lf
 plugins/**/*.sha256 text eol=lf
+
+# The Tauri CLI rewrites this file with LF during dev/build; a CRLF checkout
+# would then show up as a phantom modification.
+src-tauri/Cargo.toml text eol=lf

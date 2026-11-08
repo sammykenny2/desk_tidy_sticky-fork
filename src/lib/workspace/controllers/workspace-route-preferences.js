@@ -24,6 +24,7 @@ export function createWorkspaceRoutePreferences(input) {
         mainTab: next.mainTab,
         stickiesVisible: next.overlayEnabled,
         showPanelOnStartup: next.showPanelOnStartup ?? false,
+        desktopStickiesSelectable: next.desktopStickiesSelectable ?? false,
         workspaceTheme: normalizeWorkspaceThemePreset(next.workspaceTheme),
         workspaceCustomCss: normalizeWorkspaceCustomCss(next.workspaceCustomCss),
         workspaceZoom: next.workspaceZoom,

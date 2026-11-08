@@ -262,6 +262,24 @@ fn classify_registration_error(message: &str) -> &'static str {
     }
 }
 
+/// Actions a second launch can ask the running instance to perform, e.g.
+/// `desk_tidy_sticky --toggle-panel`. Wayland compositors do not deliver global
+/// shortcuts to the X11 hotkey listener, so on labwc these are bound to keys in
+/// `~/.config/labwc/rc.xml` instead. Returns false when `args` holds no action.
+pub(crate) fn run_command_line_action(app: &tauri::AppHandle, args: &[String]) -> bool {
+    for arg in args.iter().skip(1) {
+        match arg.as_str() {
+            "--toggle-panel" => handle_panel_shortcut(app),
+            "--toggle-global-operation" => handle_overlay_shortcut(app),
+            "--hide-or-reveal-stickies" => crate::desktop::shortcut_hide_or_reveal(app),
+            "--quit" => app.exit(0),
+            _ => continue,
+        }
+        return true;
+    }
+    false
+}
+
 fn handle_panel_shortcut(app: &tauri::AppHandle) {
     let any_visible = PANEL_WINDOW_LABELS.iter().any(|label| {
         app.get_webview_window(label)

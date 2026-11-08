@@ -254,6 +254,26 @@
 - 第一阶段 block id 不持久化，外部同步修改时需要通过 original range 校验避免覆盖。
 - 不恢复旧 `contenteditable BlockEditor`，避免历史 caret 跳动问题回归。
 
+### T-LINUX-DESKTOP · Linux 桌面（Raspberry Pi OS）支持
+
+<a id="t-linux-desktop"></a>
+
+```tracking-task
+{"id":"T-LINUX-DESKTOP","name":"Linux 桌面（Raspberry Pi OS）支持与 deb 打包","goal":"在 Raspberry Pi OS（labwc/Wayland）上可安装运行，贴纸具备桌面层/置顶层语义","scope":"Linux 编译与 WebKitGTK 渲染兼容、wlr-layer-shell 贴纸层级与定位拖拽、Wayland 下快捷键/退出替代入口、.deb 构建与冒烟脚本；不含 AppImage/rpm、交叉编译、X11 会话专项适配","acceptance":"Pi 上 make package-deb 产出 deb 且冒烟通过并可安装启动；贴纸按保存坐标显示，桌面层在图标之上窗口之下且点击穿透，置顶层可拖拽和键盘编辑，层级切换后内容完整；make check/test 通过","dependencies":[],"version":"v1","mode":"lightweight","status":"in_progress","execution_ref":"issues/2026-10-02-linux-webkitgtk-layer-shell.md","acceptance_evidence":["issues/2026-10-02-linux-webkitgtk-layer-shell.md 第 3 节实机结果；make check、make test（前端 48、Rust 60）通过"],"priority":"medium","unplanned_reason":"用户 2026-10-02 请求支持 Linux（Pi 桌面）并参照 cats-platform 提供 deb 构建"}
+```
+
+首版已落地：layer-shell 贴纸、WebKitGTK 渲染规避、命令行动作（替代 Wayland 下的全局快捷键）、wf-panel-pi 可见的托盘（ksni）、`make package-deb`，见[构建说明](build/2026-10-02-linux-deb.md)与[根因记录](issues/2026-10-02-linux-webkitgtk-layer-shell.md)。待处理：贴纸缺少程序内缩放手柄（边缘缩放不可用）；壁纸层无法在图标之下；双屏与休息遮罩未在 Wayland 下验证。
+
+### T-DESKTOP-SELECTABLE · 桌面层贴纸可选取文字选项
+
+<a id="t-desktop-selectable"></a>
+
+```tracking-task
+{"id":"T-DESKTOP-SELECTABLE","name":"桌面层贴纸可选取文字选项","goal":"用户可选择让桌面层贴纸接收鼠标以选取文字，而不必开启全局操作或置顶","scope":"偏好 desktopStickiesSelectable（默认关）、Rust 与前端统一穿透判定、设置面板开关；只影响桌面层，壁纸层仍穿透；不改变只读/拖动/编辑规则","acceptance":"默认行为不变；开启后三端桌面层贴纸可选取文字与复制，层级不变，覆盖区域不再穿透到桌面图标；切换即时生效；关闭后恢复穿透","dependencies":[],"version":"v1","mode":"lightweight","status":"in_progress","execution_ref":"ui/2026-02-07-overlay-interaction-topmost-policy.md","acceptance_evidence":["Linux（Raspberry Pi OS / labwc）实机验证","macOS 26（Intel）2026-10-03 用户实机初步确认桌面层贴纸可选取文字","Windows 待实机验证"],"priority":"medium","unplanned_reason":"用户 2026-10-03 在 Linux 验收中提出"}
+```
+
+规则与实现见[交互策略补充](ui/2026-02-07-overlay-interaction-topmost-policy.md)。待办：Windows 上确认 WorkerW 内贴纸能选取文字并用 Ctrl+C 复制；macOS 上确认桌面层贴纸不抢焦点。2026-10-03：没有桌面层贴纸时，工作台侧栏的开关也变暗并在提示中说明原因，避免全是壁纸层贴纸时被误认为开关失效。
+
 ## Done
 
 ### T-PLUGIN-PLATFORM-VALIDATION · 跨端插件运行与分发可行性

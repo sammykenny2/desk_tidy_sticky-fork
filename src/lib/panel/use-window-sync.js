@@ -2,6 +2,8 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { listen } from "@tauri-apps/api/event";
 import { applyNoSnapWhenReady } from "$lib/panel/window-effects.js";
 import { applyNoteWindowNativeEffects } from "$lib/note/note-native-effects.js";
+import { hasStickyWindow } from "$lib/note/note-interaction-policy.js";
+import { isLinuxDesktop } from "$lib/runtime/platform.js";
 
 /**
  * @param {{
@@ -13,6 +15,7 @@ import { applyNoteWindowNativeEffects } from "$lib/note/note-native-effects.js";
  */
 export function createWindowSync(deps) {
   const NOTE_WINDOW_READY_TIMEOUT_MS = 900;
+  const linuxDesktop = isLinuxDesktop();
   const WINDOW_SYNC_CONCURRENCY = 4;
 
   /** @type {Map<string, Promise<void>>} */
@@ -194,8 +197,10 @@ export function createWindowSync(deps) {
       x: isFiniteNumber(note?.x) ? note.x : undefined,
       y: isFiniteNumber(note?.y) ? note.y : undefined,
       decorations: false,
-      transparent: true,
-      backgroundColor: [0, 0, 0, 0],
+      // A WebKitGTK window created transparent repaints only damaged regions after it
+      // is shown or reconfigured and leaves the rest blank, so Linux skips both options.
+      transparent: !linuxDesktop,
+      backgroundColor: linuxDesktop ? undefined : [0, 0, 0, 0],
       alwaysOnTop: false,
       skipTaskbar: true,
       resizable: true,
@@ -263,7 +268,7 @@ export function createWindowSync(deps) {
     }
 
     const notes = deps.getNotes();
-    const activeNotes = notes.filter((n) => n.isPinned && !n.isArchived && !n.isDeleted);
+    const activeNotes = notes.filter(hasStickyWindow);
     const shouldExist = new Set(
       activeNotes.map((n) => `note-${n.id}`),
     );

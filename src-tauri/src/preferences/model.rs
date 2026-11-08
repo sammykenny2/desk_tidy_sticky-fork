@@ -23,8 +23,14 @@ pub struct PanelPreferences {
     pub sort_mode: String,
     #[serde(default = "default_glass")]
     pub glass_opacity: f64,
-    #[serde(default)]
+    // Desktop stickies are on by default, matching the panels' `overlayEnabled ?? true`.
+    // With a plain `default` a first run reads `false`, and pinned notes never open a window.
+    #[serde(default = "default_true")]
     pub overlay_enabled: bool,
+    /// Desktop-layer stickies take the mouse (text selection) instead of letting clicks
+    /// through to the desktop. Off by default, matching the panel's `?? false`.
+    #[serde(default)]
+    pub desktop_stickies_selectable: bool,
     #[serde(default)]
     pub show_panel_on_startup: bool,
     #[serde(default = "default_panel_shortcut")]
@@ -79,7 +85,9 @@ pub struct PanelPreferences {
     pub pomodoro_task_start_reminder_enabled: bool,
     #[serde(default = "default_pomodoro_task_start_reminder_lead_minutes")]
     pub pomodoro_task_start_reminder_lead_minutes: i32,
-    #[serde(default = "default_true")]
+    // Off until the user turns it on: a first run otherwise gets a full-screen break overlay
+    // every few minutes. The workspace frontend treats only an explicit `true` as enabled.
+    #[serde(default = "default_false")]
     pub pomodoro_break_reminder_enabled: bool,
     #[serde(default = "default_pomodoro_mini_break_postpone_minutes")]
     pub pomodoro_mini_break_postpone_minutes: i32,
@@ -239,6 +247,12 @@ pub fn patch_preferences(updates: serde_json::Value) -> Result<PanelPreferences,
 pub fn read_show_panel_on_startup() -> bool {
     read_preferences()
         .map(|prefs| prefs.show_panel_on_startup)
+        .unwrap_or(false)
+}
+
+pub fn read_desktop_stickies_selectable() -> bool {
+    read_preferences()
+        .map(|prefs| prefs.desktop_stickies_selectable)
         .unwrap_or(false)
 }
 

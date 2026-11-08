@@ -31,7 +31,7 @@ export function isTaskEffectiveTargetMet(effectiveSeconds, targetSeconds) {
 export function getSafeConfig(config, clamp) {
   const raw = /** @type {any} */ (config || {});
   return {
-    breakReminderEnabled: raw.breakReminderEnabled !== false,
+    breakReminderEnabled: raw.breakReminderEnabled === true,
     focusMinutes: clamp(raw.focusMinutes, 25, 5, 90),
     shortBreakMinutes: clamp(raw.shortBreakMinutes, 5, 1, 30),
     longBreakMinutes: clamp(raw.longBreakMinutes, 15, 5, 60),

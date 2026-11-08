@@ -146,6 +146,7 @@
   let isAutostartEnabled = $state(false);
   let autostartAvailable = $state(false);
   let showPanelOnStartup = $state(false);
+  let desktopStickiesSelectable = $state(false);
   let markdownStorageMode = $state("app_default");
   let markdownStorageRoot = $state("");
   let markdownStorageSnapshot = $state(null);
@@ -173,7 +174,7 @@
   let viewportHeight = $state(860);
   let viewportDpr = $state(1);
   let pomodoroConfig = $state({
-    breakReminderEnabled: true,
+    breakReminderEnabled: false,
     focusMinutes: 25,
     shortBreakMinutes: 5,
     longBreakMinutes: 15,
@@ -407,6 +408,9 @@
     if ("mainTab" in patch && patch.mainTab !== mainTab) void setMainTab(patch.mainTab);
     if ("stickiesVisible" in patch) stickiesVisible = patch.stickiesVisible;
     if ("showPanelOnStartup" in patch) showPanelOnStartup = patch.showPanelOnStartup;
+    if ("desktopStickiesSelectable" in patch) {
+      desktopStickiesSelectable = patch.desktopStickiesSelectable;
+    }
     if ("workspaceTheme" in patch) workspaceTheme = patch.workspaceTheme;
     if ("workspaceCustomCss" in patch) workspaceCustomCss = patch.workspaceCustomCss;
     if ("workspaceZoom" in patch) workspaceZoom = patch.workspaceZoom;
@@ -433,6 +437,11 @@
     setState: setWorkspaceRouteState,
   });
   const { loadPrefs, savePrefs } = routePreferences;
+
+  async function toggleDesktopStickiesSelectable() {
+    desktopStickiesSelectable = !desktopStickiesSelectable;
+    await savePrefs({ desktopStickiesSelectable });
+  }
 
   const workspaceStorageActions = createWorkspaceStorageActions({
     onImported: () => loadNotes(),
@@ -764,6 +773,9 @@
     setShowPanelOnStartup: (next) => {
       showPanelOnStartup = next;
     },
+    setDesktopStickiesSelectable: (next) => {
+      desktopStickiesSelectable = next;
+    },
     setAutostartEnabled: (next) => {
       isAutostartEnabled = next;
     },
@@ -932,10 +944,13 @@
     {noteViewCounts}
     {stickiesVisible}
     {globalControlDisabled}
+    {desktopStickiesSelectable}
+    {notes}
     focusDeadlines={deadlineTasks}
     onDeadlineAction={handleDeadlineAction}
     onToggleStickiesVisibility={toggleStickiesVisibility}
     onToggleGlobalControl={toggleGlobalControl}
+    onToggleDesktopStickiesSelectable={toggleDesktopStickiesSelectable}
   />
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="sidebar-splitter" onpointerdown={resizeController.startSidebarResize} ondblclick={() => (sidebarWidth = 260)}></div>
@@ -1061,6 +1076,7 @@
   {isAutostartEnabled}
   {autostartAvailable}
   bind:showPanelOnStartup
+  {desktopStickiesSelectable}
   storageMode={markdownStorageMode}
   storageRoot={markdownStorageRoot}
   storageSnapshot={markdownStorageSnapshot}

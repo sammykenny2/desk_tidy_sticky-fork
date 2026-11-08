@@ -13,6 +13,7 @@
     isAutostartEnabled = false,
     autostartAvailable = false,
     showPanelOnStartup = $bindable(false),
+    desktopStickiesSelectable = false,
     shortcutSettings,
     shortcutSettingsSaving = false,
     storageMode = /** @type {"app_default" | "custom_directory"} */ ("app_default"),
@@ -139,6 +140,7 @@
           {isAutostartEnabled}
           {autostartAvailable}
           {showPanelOnStartup}
+          {desktopStickiesSelectable}
           {shortcutSettings}
           {shortcutSettingsSaving}
           {taskStartReminderLeadMinutes}

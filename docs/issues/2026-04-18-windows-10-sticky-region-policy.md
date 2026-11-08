@@ -1,5 +1,8 @@
 # Windows Sticky Window Region Policy
 
+> Superseded on 2026-10-03 by `2026-10-03-windows-sticky-rounded-corners.md`: Windows notes are
+> rounded again, with a native rounded window region.
+
 ## Context
 
 Windows stickies can be attached as WorkerW child windows to sit on the desktop layer. The app used

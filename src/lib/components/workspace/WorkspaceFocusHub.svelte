@@ -92,7 +92,7 @@
       taskTitle: "",
     },
     pomodoroConfig = {
-      breakReminderEnabled: true,
+      breakReminderEnabled: false,
       focusMinutes: 25,
       shortBreakMinutes: 5,
       longBreakMinutes: 15,

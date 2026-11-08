@@ -179,6 +179,12 @@ pub fn persist_note_window_size(
     } else {
         1.0
     };
+    // A layer-shell note's toolkit size is stale; the platform layer tracks the real one.
+    #[cfg(target_os = "linux")]
+    let size = match crate::platform::linux::note_surface_geometry(&window) {
+        Some(g) => tauri::LogicalSize::new(g.width, g.height).to_physical::<u32>(scale),
+        None => size,
+    };
     // The native frame includes the control-mode reserve, but the stored size is
     // the note body. Measuring the frame without subtracting what the window
     // reserved would grow the note on every control-mode open/close round trip.
